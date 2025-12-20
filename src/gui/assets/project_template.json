@@ -1,0 +1,27 @@
+{
+  "name": "<PRJ_ICON> <PRJ_NAME>",
+  "children": [
+    {
+      "name": "🗓️ Tasks",
+      "children": [
+        {
+          "name": "A new beginning",
+          "content": [
+            "# Thoughts",
+            "- [ ] Never give up \uD83D\uDCAA",
+            "- [ ] One step at a time ✨"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📚 Wiki",
+      "children": [
+        {
+          "name": "📓 Usage",
+          "children": []
+        }
+      ]
+    }
+  ]
+}

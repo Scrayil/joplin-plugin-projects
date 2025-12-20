@@ -1,0 +1,16 @@
+{
+	"manifest_version": 1,
+	"id": "com.scrayil.joplin-plugin-projects",
+	"app_min_version": "3.4.12",
+	"version": "1.0.0",
+	"name": "Projects",
+	"description": "Easily manage and schedule projects, integrating tasks directly with your knowledge base.",
+	"author": "Mattia Bennati (Scrayil)",
+	"homepage_url": "https://github.com/Scrayil",
+	"repository_url": "https://github.com/Scrayil/joplin-plugin-projects",
+	"keywords": [],
+	"categories": [],
+	"screenshots": [],
+	"icons": {},
+	"promo_tile": {}
+}

@@ -308,8 +308,9 @@ function resolveExtraScriptPath(name) {
 			filename: `${nameNoExt}.js`,
 			path: distDir,
 			library: 'default',
-			libraryTarget: 'commonjs',
+			libraryTarget: 'umd',
 			libraryExport: 'default',
+			globalObject: 'window',
 		},
 	};
 }

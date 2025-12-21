@@ -10,6 +10,7 @@ export const Config = {
 
     COMMANDS: {
         NEW_PROJECT: PREFIX + 'create_new_project',
+        TOGGLE_DASHBOARD: PREFIX + 'toggle_dashboard',
     },
 
     MENUS: {
@@ -17,6 +18,7 @@ export const Config = {
         TOOLBAR_CONTEXT: PREFIX + 'create_new_project_toolbar_menu',
         FOLDER_CONTEXT: PREFIX + 'create_new_project_folders_menu',
         NOTES_CONTEXT: PREFIX + 'create_new_project_notes_menu',
+        DASHBOARD_BUTTON: PREFIX + 'dashboard_button',
     },
 
     DIALOGS: {

@@ -1,7 +1,8 @@
 import joplin from "../../api";
-import {MenuItemLocation} from "../../api/types";
+import {MenuItemLocation, ToolbarButtonLocation} from "../../api/types";
 import {newProjectDialog} from "../gui/dialogs";
 import {Config} from "./constants";
+import {TaskDashboard} from "../gui/TaskDashboard";
 
 export const registerJoplinCommands = async () => {
     // Registers a command that creates the TOT note.
@@ -14,6 +15,21 @@ export const registerJoplinCommands = async () => {
             await newProjectDialog()
         },
     });
+
+    await joplin.commands.register({
+        name: Config.COMMANDS.TOGGLE_DASHBOARD,
+        label: 'Toggle Project Dashboard',
+        iconName: 'fas fa-columns',
+        execute: async () => {
+            await TaskDashboard.getInstance().toggle();
+        },
+    });
+
+    await joplin.views.toolbarButtons.create(
+        Config.MENUS.DASHBOARD_BUTTON,
+        Config.COMMANDS.TOGGLE_DASHBOARD,
+        ToolbarButtonLocation.NoteToolbar
+    );
 
     // Adds also a context menu entry for the note editor, to generate the corresponding TOT
     await joplin.views.menuItems.create(Config.MENUS.TOOLBAR_CONTEXT, Config.COMMANDS.NEW_PROJECT, MenuItemLocation.Tools, {accelerator: Config.MENUS.ACCELERATOR})

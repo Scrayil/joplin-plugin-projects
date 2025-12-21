@@ -8,6 +8,7 @@ const App: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'kanban' | 'calendar' | 'table' | 'new_task'>('kanban');
     const [data, setData] = useState<DashboardData>({ projects: [], tasks: [] });
     const [loading, setLoading] = useState(true);
+    const [projectFilter, setProjectFilter] = useState<string>('all');
 
     const fetchData = React.useCallback(async () => {
         try {
@@ -52,11 +53,11 @@ const App: React.FC = () => {
         return () => clearInterval(interval);
     }, [fetchData]);
 
-    const handleCreateTask = async (title: string, projectId: string, subTasks: string[], urgency: string) => {
+    const handleCreateTask = async (title: string, projectId: string, subTasks: string[], urgency: string, dueDate: number | undefined) => {
         try {
             await window.webviewApi.postMessage({ 
                 name: 'createTask', 
-                payload: { title, projectId, subTasks, urgency } 
+                payload: { title, projectId, subTasks, urgency, dueDate } 
             });
             // Refresh data
             await fetchData();
@@ -122,13 +123,31 @@ const App: React.FC = () => {
         }
     };
 
+    // Filter tasks based on selected project
+    const displayedTasks = projectFilter === 'all' 
+        ? data.tasks 
+        : data.tasks.filter(t => t.projectId === projectFilter);
+
     if (loading) return <div>Loading tasks...</div>;
 
     return (
         <div className="dashboard-container">
             <div className="header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                    <h1>Project Tasks</h1>
+                    {data.projects.length > 1 ? (
+                        <select 
+                            className="project-filter-select"
+                            value={projectFilter} 
+                            onChange={(e) => setProjectFilter(e.target.value)}
+                        >
+                            <option value="all">All Tasks</option>
+                            {data.projects.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
+                    ) : (
+                        <h1>Project Tasks</h1>
+                    )}
                     <button 
                         onClick={() => setActiveTab('new_task')} 
                         className={activeTab === 'new_task' ? 'active' : ''}
@@ -160,12 +179,16 @@ const App: React.FC = () => {
             
             <div className="content">
                 {activeTab === 'kanban' && <KanbanBoard 
-                    tasks={data.tasks} 
+                    tasks={displayedTasks} 
                     projects={data.projects} 
                     onUpdateStatus={handleUpdateStatus}
                     onToggleSubTask={handleToggleSubTask}
                 />}
-                {activeTab === 'new_task' && <CreateTaskForm projects={data.projects} onCreateTask={handleCreateTask} />}
+                {activeTab === 'new_task' && (
+                    <div className="centered-view">
+                        <CreateTaskForm projects={data.projects} onCreateTask={handleCreateTask} />
+                    </div>
+                )}
                 {activeTab === 'calendar' && <div>Calendar View (Coming Soon)</div>}
                 {activeTab === 'table' && <div>Table View (Coming Soon)</div>}
             </div>

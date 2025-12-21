@@ -117,7 +117,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStat
                                             </div>
                                             {renderTags(task.tags)}
                                             {renderSubTasks(task)}
-                                            {task.dueDate > 0 && <div className="task-due">Due: {new Date(task.dueDate).toLocaleDateString()}</div>}
+                                            {task.dueDate > 0 && <div className="task-due">Due: {new Date(task.dueDate).toLocaleString()}</div>}
                                         </div>
                                     )}
                                 </Draggable>

@@ -4,7 +4,7 @@ import { Project } from '../types';
 
 interface CreateTaskFormProps {
     projects: Project[];
-    onCreateTask: (title: string, projectId: string, subTasks: string[], urgency: string) => void;
+    onCreateTask: (title: string, projectId: string, subTasks: string[], urgency: string, dueDate: number | undefined) => void;
 }
 
 const CreateTaskForm: React.FC<CreateTaskFormProps> = ({ projects, onCreateTask }) => {
@@ -13,6 +13,7 @@ const CreateTaskForm: React.FC<CreateTaskFormProps> = ({ projects, onCreateTask 
     const [subTasks, setSubTasks] = useState<string[]>([]);
     const [currentSubTask, setCurrentSubTask] = useState('');
     const [urgency, setUrgency] = useState<string>('normal');
+    const [dueDate, setDueDate] = useState<string>('');
 
     const handleAddSubTask = () => {
         if (!currentSubTask.trim()) return;
@@ -22,10 +23,14 @@ const CreateTaskForm: React.FC<CreateTaskFormProps> = ({ projects, onCreateTask 
 
     const handleCreate = () => {
         if (!newTaskTitle.trim() || !selectedProject) return;
-        onCreateTask(newTaskTitle, selectedProject, subTasks, urgency);
+        
+        const timestamp = dueDate ? new Date(dueDate).getTime() : undefined;
+        
+        onCreateTask(newTaskTitle, selectedProject, subTasks, urgency, timestamp);
         setNewTaskTitle('');
         setSubTasks([]);
         setUrgency('normal');
+        setDueDate('');
     };
 
     return (
@@ -56,17 +61,30 @@ const CreateTaskForm: React.FC<CreateTaskFormProps> = ({ projects, onCreateTask 
                 </select>
             </div>
 
-            <div className="form-group">
-                <label>Urgency</label>
-                <select 
-                    className="form-control"
-                    value={urgency} 
-                    onChange={(e) => setUrgency(e.target.value)}
-                >
-                    <option value="high">🔴 High</option>
-                    <option value="normal">🟡 Normal</option>
-                    <option value="low">🔵 Low</option>
-                </select>
+            <div style={{ display: 'flex', gap: '15px' }}>
+                <div className="form-group" style={{ flex: 1 }}>
+                    <label>Due Date</label>
+                    <input 
+                        type="datetime-local" 
+                        className="form-control"
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                        style={{ fontFamily: 'inherit' }}
+                    />
+                </div>
+
+                <div className="form-group" style={{ flex: 1 }}>
+                    <label>Urgency</label>
+                    <select 
+                        className="form-control"
+                        value={urgency} 
+                        onChange={(e) => setUrgency(e.target.value)}
+                    >
+                        <option value="high">🔴 High</option>
+                        <option value="normal">🟡 Normal</option>
+                        <option value="low">🔵 Low</option>
+                    </select>
+                </div>
             </div>
 
             <div className="form-group">

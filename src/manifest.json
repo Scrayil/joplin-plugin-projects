@@ -3,6 +3,7 @@
 	"id": "com.scrayil.joplin-plugin-projects",
 	"app_min_version": "3.4.12",
 	"version": "1.0.0",
+	"platforms": ["desktop", "mobile"],
 	"name": "Projects",
 	"description": "Easily manage and schedule projects, integrating tasks directly with your knowledge base.",
 	"author": "Mattia Bennati (Scrayil)",

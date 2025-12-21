@@ -26,7 +26,7 @@ export const registerSettings = async () => {
             subType: SettingItemSubType.FilePath,
             section: settingsSection,
             public: true,
-            label: 'New project template (.yaml)',
+            label: 'New project template (.json)',
             description: "Use a custom folder structure for new projects",
             advanced: true,
         },

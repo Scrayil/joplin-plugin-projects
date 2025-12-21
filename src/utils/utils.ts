@@ -47,18 +47,3 @@ export async function setSettingValue(settingKey: string, value: any) {
         return "";
     }
 }
-
-export function parseYamlContentIntoArray(yamlContent: string) {
-    const lines = yamlContent.split("\n")
-    let lastIndentation = 0
-    for (const line of lines) {
-        if(line.length === 0) continue
-        const indentationMatch = /^\s+/.exec(line)
-        const newIndentation = indentationMatch && indentationMatch.length>0 ? indentationMatch[0].length : 0
-        if(newIndentation - lastIndentation > 2 || line.trim().startsWith("--")) {
-            return []
-        }
-        lastIndentation = newIndentation
-    }
-    return lines
-}

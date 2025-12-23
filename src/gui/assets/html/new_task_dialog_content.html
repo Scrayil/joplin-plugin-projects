@@ -8,9 +8,12 @@
 
         <div class="form-group">
             <label for="taskProject">Project</label>
-            <select id="taskProject" name="taskProject" class="form-control">
-                <!-- Options will be injected via JS or dynamically generated HTML -->
-            </select>
+            <div class="project-input-group">
+                <select id="taskProject" name="taskProject" class="form-control">
+                    <!-- Options will be injected via JS or dynamically generated HTML -->
+                </select>
+                <button type="button" id="btnAddNewProject" class="btn-inline-add" title="Create new project">+</button>
+            </div>
         </div>
 
         <div class="form-row">

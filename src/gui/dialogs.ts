@@ -50,24 +50,34 @@ export async function newTaskDialog() {
     let dialog: string;
     const pluginFolder = await getPluginFolder();
     
-    // Always recreate or update HTML to ensure project list is fresh
-    // But we reuse the handle if exists to avoid creating multiple dialogs
     if (!HANDLES[Config.DIALOGS.CREATE_TASK]) {
         dialog = await joplin.views.dialogs.create(Config.DIALOGS.CREATE_TASK);
         HANDLES[Config.DIALOGS.CREATE_TASK] = dialog;
-        await joplin.views.dialogs.setButtons(dialog, [{id: "cancel", title: "Cancel"}, {id: "create", title: "Create Task"}]);
         await joplin.views.dialogs.addScript(dialog, path.join(".", "gui", "assets", "css", "new_task_dialog_content_style.css"));
         await joplin.views.dialogs.addScript(dialog, path.join(".", "gui", "assets", "js", "new_task_dialog_content_script.js"));
     } else {
         dialog = HANDLES[Config.DIALOGS.CREATE_TASK];
     }
 
+    // Set buttons - include Add Project (will be hidden via script)
+    await joplin.views.dialogs.setButtons(dialog, [
+        {id: "cancel", title: "Cancel"}, 
+        {id: "add_project", title: "AddProjectInternal"}, 
+        {id: "create", title: "Create Task"}
+    ]);
+
     // Load HTML template
     let html = readFileContent(path.join(pluginFolder, "gui", "assets", "html", "new_task_dialog_content.html")) || "Error loading form";
     
     // Inject projects
     const projects = await getAllProjects();
-    const optionsHtml = projects.map((p: any) => `<option value="${p.id}">${p.name}</option>`).join('');
+    let optionsHtml = projects.map((p: any) => `<option value="${p.id}">${p.name}</option>`).join('');
+    
+    if (projects.length === 0) {
+        optionsHtml = '<option value="">Create a project first...</option>';
+        html = html.replace('id="taskProject" name="taskProject"', 'id="taskProject" name="taskProject" disabled');
+    }
+    
     html = html.replace('<!-- Options will be injected via JS or dynamically generated HTML -->', optionsHtml);
 
     await joplin.views.dialogs.setHtml(dialog, html);
@@ -75,6 +85,12 @@ export async function newTaskDialog() {
     const result = await joplin.views.dialogs.open(dialog);
     console.log('newTaskDialog: result received:', result);
     
+    if (result.id === "add_project") {
+        await newProjectDialog();
+        // Re-open task dialog after project creation
+        return await newTaskDialog();
+    }
+
     if (result.id === "create") {
         return result.formData?.['taskForm'];
     }

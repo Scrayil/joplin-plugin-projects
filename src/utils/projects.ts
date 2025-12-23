@@ -42,7 +42,7 @@ export async function createProject(projectName: string, projectIcon: string) {
     if (!projectTemplate) {
         logger.error(`Unable to load the project template: ${projectTemplateFile}`)
     } else {
-        const projectStructure = JSON.parse(projectTemplate.replace("<PRJ_ICON>", projectIcon).replace("<PRJ_NAME>", projectName))
+        const projectStructure = JSON.parse(projectTemplate.replace("<PRJ_ICON> ", projectIcon.length > 0 ? projectIcon + " " : projectIcon).replace("<PRJ_NAME>", projectName))
         let projectParentNotebookId = await getSettingValue(Config.SETTINGS.PROJECTS_PRIVATE_PARENT_NOTEBOOK_FILE)
         if(!projectParentNotebookId || Object.keys(await getNotebookTitleById(projectParentNotebookId)).length === 0) {
             let kanbanId: any

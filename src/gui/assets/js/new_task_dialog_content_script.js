@@ -21,6 +21,33 @@
     const list = document.getElementById('subTaskList');
     const hiddenInput = document.getElementById('taskSubTasks');
     const dateInput = document.getElementById('taskDueDate');
+    const btnAddNewProject = document.getElementById('btnAddNewProject');
+
+    // Function to find and handle the hidden footer button
+    function getInternalAddProjectBtn() {
+        const buttons = window.parent.document.querySelectorAll('button');
+        for (const btn of buttons) {
+            if (btn.textContent === 'AddProjectInternal') return btn;
+        }
+        return null;
+    }
+
+    // Hide the internal button as soon as it's found
+    const hideInterval = setInterval(() => {
+        const btn = getInternalAddProjectBtn();
+        if (btn) {
+            btn.style.display = 'none';
+            clearInterval(hideInterval);
+        }
+    }, 50);
+    setTimeout(() => clearInterval(hideInterval), 2000); // Safety timeout
+
+    if (btnAddNewProject) {
+        btnAddNewProject.addEventListener('click', () => {
+            const btn = getInternalAddProjectBtn();
+            if (btn) btn.click();
+        });
+    }
 
     // Open picker on any click on the date input
     if (dateInput) {

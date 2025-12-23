@@ -43,6 +43,12 @@ export class TaskDashboard {
                     // Parse form data
                     const title = formData.taskTitle;
                     const projectId = formData.taskProject;
+                    
+                    if (!title || title.trim().length === 0) {
+                        await joplin.views.dialogs.showToast({ message: "Task title required", duration: 3000, type: ToastType.Error });
+                        return;
+                    }
+
                     const urgency = formData.taskUrgency;
                     const dueDateStr = formData.taskDueDate; // "YYYY-MM-DDTHH:mm"
                     const dueDate = dueDateStr ? new Date(dueDateStr).getTime() : undefined;
@@ -51,9 +57,15 @@ export class TaskDashboard {
                     const subTasks = subTasksStr.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
 
                     await this.createTask({ title, projectId, subTasks, urgency, dueDate });
+                    // No need for redundant toast if createTask already shows one, but 
+                    // consistent with newProjectDialog we can handle it here or ensure createTask is silent.
+                    // Currently createTask shows a toast, so we are good.
+                    
                     // Trigger refresh
                     await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
                     return;
+                } else {
+                    await joplin.views.dialogs.showToast({ message: "Task creation canceled", duration: 3000, type: ToastType.Info });
                 }
                 return;
             }
@@ -189,54 +201,68 @@ export class TaskDashboard {
     }
 
     private async createTask(payload: { title: string; projectId: string; subTasks?: string[]; urgency?: string; dueDate?: number }) {
-        // We need to find the 'Tasks' folder within the project.
-        // Assuming the structure is Project -> 🗓️ Tasks (based on template)
+        console.log('TaskDashboard: Creating task with payload:', payload);
         
-        // 1. Get children of the project folder
-        const projectChildren = await joplin.data.get(['folders'], { parent_id: payload.projectId });
-        let tasksFolderId = '';
-        
-        // Try to find a folder named 'Tasks' or similar
-        const tasksFolder = projectChildren.items.find((f: any) => f.title.includes('Tasks') || f.title.includes('To-Do'));
-        
-        if (tasksFolder) {
-            tasksFolderId = tasksFolder.id;
-        } else {
-            // If no explicit tasks folder, put it in the project root
-            tasksFolderId = payload.projectId;
-        }
-
-        // 2. Prepare body with sub-tasks
-        let body = "";
-        if (payload.subTasks && payload.subTasks.length > 0) {
-            body = payload.subTasks.map(st => `- [ ] ${st}`).join('\n');
-        }
-
-        const note = await createNote(payload.title, body, true, tasksFolderId);
-
-        // Set due date
-        if (payload.dueDate) {
-            await joplin.data.put(['notes', note.id], null, { todo_due: payload.dueDate });
-        }
-
-        // 3. Handle Urgency Tags
-        if (payload.urgency && payload.urgency !== 'normal') {
-            let tagTitle = '';
-            if (payload.urgency === 'high') tagTitle = '🔴 High';
-            if (payload.urgency === 'low') tagTitle = '🔵 Low';
+        try {
+            // 1. Get folders inside the project folder to find the "Tasks" subfolder
+            // Correct way to get subfolders: filter 'folders' by parent_id
+            const allFolders = await this.fetchAllFolders();
+            const projectFolders = allFolders.filter((f: any) => f.parent_id === payload.projectId);
             
-            if (tagTitle) {
-                const tagId = await this.ensureTag(tagTitle);
-                await joplin.data.post(['tags', tagId, 'notes'], null, { id: note.id });
+            let tasksFolderId = '';
+            
+            // Try to find a folder named 'Tasks' or similar
+            const tasksFolder = projectFolders.find((f: any) => 
+                f.title.toLowerCase().includes('tasks') || 
+                f.title.toLowerCase().includes('todo') ||
+                f.title.toLowerCase().includes('to-do')
+            );
+            
+            if (tasksFolder) {
+                console.log('TaskDashboard: Found specific tasks folder:', tasksFolder.title, tasksFolder.id);
+                tasksFolderId = tasksFolder.id;
+            } else {
+                console.log('TaskDashboard: No tasks folder found, using project root:', payload.projectId);
+                tasksFolderId = payload.projectId;
             }
-        } else if (payload.urgency === 'normal') {
-             const tagId = await this.ensureTag('🟡 Medium');
-             await joplin.data.post(['tags', tagId, 'notes'], null, { id: note.id });
-        }
-        
-        await joplin.views.dialogs.showToast({ message: "Task created successfully!", duration: 3000, type: ToastType.Success });
 
-        return { success: true };
+            // 2. Prepare body with sub-tasks
+            let body = "";
+            if (payload.subTasks && payload.subTasks.length > 0) {
+                body = payload.subTasks.map(st => `- [ ] ${st}`).join('\n');
+            }
+
+            const note = await createNote(payload.title, body, true, tasksFolderId);
+            console.log('TaskDashboard: Note created:', note.id);
+
+            // Set due date
+            if (payload.dueDate) {
+                await joplin.data.put(['notes', note.id], null, { todo_due: payload.dueDate });
+            }
+
+            // 3. Handle Urgency Tags
+            if (payload.urgency && payload.urgency !== 'normal') {
+                let tagTitle = '';
+                if (payload.urgency === 'high') tagTitle = '🔴 High';
+                if (payload.urgency === 'low') tagTitle = '🔵 Low';
+                
+                if (tagTitle) {
+                    const tagId = await this.ensureTag(tagTitle);
+                    await joplin.data.post(['tags', tagId, 'notes'], null, { id: note.id });
+                }
+            } else if (payload.urgency === 'normal') {
+                 const tagId = await this.ensureTag('🟡 Medium');
+                 await joplin.data.post(['tags', tagId, 'notes'], null, { id: note.id });
+            }
+            
+            await joplin.views.dialogs.showToast({ message: "Task created successfully!", duration: 3000, type: ToastType.Success });
+            return { success: true };
+
+        } catch (error) {
+            console.error('TaskDashboard: Error in createTask:', error);
+            await joplin.views.dialogs.showToast({ message: "Error creating task: " + error.message, duration: 5000, type: ToastType.Error });
+            return { success: false };
+        }
     }
 
     private async fetchAllItems(path: string[], query: any = null) {

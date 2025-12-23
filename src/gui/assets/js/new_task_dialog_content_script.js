@@ -1,5 +1,5 @@
 (function() {
-    // 1. Theme Detection for Natvie Controls (Datetime picker)
+    // 1. Theme Detection
     function updateTheme() {
         const textColor = getComputedStyle(document.body).getPropertyValue('--joplin-color').trim();
         let isDark = false;
@@ -20,25 +20,37 @@
     const btn = document.getElementById('btnAddSubTask');
     const list = document.getElementById('subTaskList');
     const hiddenInput = document.getElementById('taskSubTasks');
+    const dateInput = document.getElementById('taskDueDate');
+
+    // Open picker on any click on the date input
+    if (dateInput) {
+        dateInput.addEventListener('click', () => {
+            if (typeof dateInput.showPicker === 'function') {
+                dateInput.showPicker();
+            }
+        });
+    }
 
     function updateList() {
         list.innerHTML = '';
-        if (subTasks.length > 0) {
-            list.classList.add('has-items');
-        } else {
-            list.classList.remove('has-items');
-        }
-
-        subTasks.forEach((task, index) => {
+        
+        // Render at least 5 rows
+        const rowsToRender = Math.max(5, subTasks.length);
+        
+        for (let i = 0; i < rowsToRender; i++) {
+            const task = subTasks[i];
+            const isEmpty = i >= subTasks.length;
+            
             const li = document.createElement('li');
-            li.className = 'subtask-item';
+            li.className = 'subtask-item' + (isEmpty ? ' empty' : '');
             li.innerHTML = `
-                <span>${task}</span>
-                <button type="button" class="btn-remove" data-index="${index}">×</button>
+                <span>${isEmpty ? '-' : task}</span>
+                <button type="button" class="btn-remove" data-index="${i}">×</button>
             `;
             list.appendChild(li);
-        });
-        // Store as newline-separated for backend compatibility
+        }
+        
+        // Store only real tasks
         hiddenInput.value = subTasks.join('\n');
     }
 
@@ -59,10 +71,16 @@
     });
 
     list.addEventListener('click', (e) => {
-        if (e.target.classList.contains('btn-remove')) {
-            const index = parseInt(e.target.getAttribute('data-index'));
-            subTasks.splice(index, 1);
-            updateList();
+        const target = e.target.closest('.btn-remove');
+        if (target) {
+            const index = parseInt(target.getAttribute('data-index'));
+            if (index < subTasks.length) {
+                subTasks.splice(index, 1);
+                updateList();
+            }
         }
     });
+
+    // Initial render
+    updateList();
 })();

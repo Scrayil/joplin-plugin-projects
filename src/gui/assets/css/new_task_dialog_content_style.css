@@ -20,8 +20,8 @@ body {
     border: 1px solid var(--joplin-divider-color);
     border-radius: 8px;
     padding: 20px;
-    width: 550px; /* Optimized width */
-    min-height: 500px;
+    width: 550px;
+    min-height: 550px; /* Increased to accommodate fixed subtask height */
     position: relative;
     display: flex;
     flex-direction: column;
@@ -64,6 +64,10 @@ textarea {
     outline: none;
 }
 
+input[type="datetime-local"] {
+    cursor: pointer;
+}
+
 .form-control:focus {
     border-color: var(--joplin-selected-color);
 }
@@ -87,17 +91,13 @@ textarea {
     list-style: none;
     padding: 0;
     margin: 0;
-    max-height: 200px;
+    max-height: 212px; /* Sufficient for 5 items without scrolling */
     overflow-y: auto;
-    background: rgba(128, 128, 128, 0.05);
+    overflow-x: hidden;
+    background: rgba(128, 128, 128, 0.03);
     border-radius: 4px;
-    flex: 1;
-    display: none; /* Hidden when empty */
-}
-
-.subtask-list.has-items {
-    display: block;
     border: 1px solid var(--joplin-divider-color);
+    display: block; /* Always visible */
 }
 
 .subtask-item {
@@ -106,10 +106,16 @@ textarea {
     align-items: center;
     padding: 8px 12px;
     border-bottom: 1px solid var(--joplin-divider-color);
+    min-height: 42px; /* Consistent height for empty rows */
 }
 
 .subtask-item:last-child {
     border-bottom: none;
+}
+
+.subtask-item.empty {
+    color: transparent;
+    user-select: none;
 }
 
 .btn-add {
@@ -129,6 +135,11 @@ textarea {
     cursor: pointer;
     font-weight: bold;
     font-size: 1.1rem;
+    visibility: hidden; /* Hidden by default */
+}
+
+.subtask-item:not(.empty) .btn-remove {
+    visibility: visible; /* Show only when row is not empty */
 }
 
 ::-webkit-scrollbar {

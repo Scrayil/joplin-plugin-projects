@@ -73,6 +73,7 @@ export async function newTaskDialog() {
     await joplin.views.dialogs.setHtml(dialog, html);
 
     const result = await joplin.views.dialogs.open(dialog);
+    console.log('newTaskDialog: result received:', result);
     
     if (result.id === "create") {
         return result.formData?.['taskForm'];

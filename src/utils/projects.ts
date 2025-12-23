@@ -26,10 +26,7 @@ async function createProjectNotebooksAndNotes(projectStructure: NotebookObject, 
 }
 
 async function createProjectsRoot() {
-    const projectParentNotebookId = (await createNotebook("🗂️ Projects", "")).id
-    const kanban = await createNote( "WIP", readFileContent(path.join(await getPluginFolder(), "gui", "assets", "main_kanban.md")), false, projectParentNotebookId)
-    await createNote( "Pending tasks", readFileContent(path.join(await getPluginFolder(), "gui", "assets", "main_overview.md")), false, projectParentNotebookId)
-    return [projectParentNotebookId, kanban.id]
+    return (await createNotebook("🗂️ Projects", "")).id
 }
 
 export async function createProject(projectName: string, projectIcon: string) {
@@ -45,11 +42,8 @@ export async function createProject(projectName: string, projectIcon: string) {
         const projectStructure = JSON.parse(projectTemplate.replace("<PRJ_ICON> ", projectIcon.length > 0 ? projectIcon + " " : projectIcon).replace("<PRJ_NAME>", projectName))
         let projectParentNotebookId = await getSettingValue(Config.SETTINGS.PROJECTS_PRIVATE_PARENT_NOTEBOOK_FILE)
         if(!projectParentNotebookId || Object.keys(await getNotebookTitleById(projectParentNotebookId)).length === 0) {
-            let kanbanId: any
-            [projectParentNotebookId, kanbanId] = await createProjectsRoot()
+            projectParentNotebookId= await createProjectsRoot()
             await setSettingValue(Config.SETTINGS.PROJECTS_PRIVATE_PARENT_NOTEBOOK_FILE, projectParentNotebookId)
-            // Opens and focuses the kanban note on creation
-            await joplin.commands.execute('openNote', kanbanId);
         }
         await createProjectNotebooksAndNotes(projectStructure, projectParentNotebookId);
     }

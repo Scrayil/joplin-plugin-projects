@@ -24,6 +24,31 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        // Theme detection logic
+        const updateTheme = () => {
+            const textColor = getComputedStyle(document.body).getPropertyValue('--joplin-color').trim();
+            
+            let isDark = false;
+            
+            if (textColor.startsWith('#')) {
+                const hex = textColor.substring(1);
+                const r = parseInt(hex.substring(0, 2), 16);
+                const g = parseInt(hex.substring(2, 4), 16);
+                const b = parseInt(hex.substring(4, 6), 16);
+                // Calculate luminance
+                const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+                
+                if (brightness > 128) { // Text is light -> Background is Dark
+                    isDark = true;
+                }
+            }
+            
+            document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+            document.documentElement.style.setProperty('accent-color', 'var(--joplin-selected-color)');
+        };
+
+        updateTheme();
+
         console.log("App mounted. webviewApi:", window.webviewApi);
         fetchData();
 

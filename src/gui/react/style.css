@@ -35,6 +35,33 @@ body {
     overflow: hidden;
 }
 
+/* ... existing styles ... */
+
+.form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background-color: var(--joplin-background-color); /* Explicit background */
+    color: var(--text-color); /* Explicit text color */
+    box-sizing: border-box;
+    font-family: inherit;
+    font-size: 0.95rem;
+    color-scheme: inherit; /* Ensure inputs inherit the dark/light scheme */
+}
+
+/* Ensure dropdown options have correct background */
+select.form-control option {
+    background-color: var(--joplin-background-color);
+    color: var(--text-color);
+}
+
+/* Specifically for datetime-local picker icon and appearance */
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    /* Remove invert filter, rely on color-scheme */
+}
+
 .header {
     background: var(--joplin-background-color);
     padding: 10px 20px;
@@ -220,6 +247,12 @@ body {
     background-size: 0.65em auto;
     border-radius: 4px;
     transition: border-color 0.2s;
+    color-scheme: inherit; /* Inherit dark/light scheme */
+}
+
+.project-filter-select option {
+    background-color: var(--joplin-background-color);
+    color: var(--text-color);
 }
 
 .project-filter-select:hover {

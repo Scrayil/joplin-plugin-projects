@@ -96,3 +96,74 @@ export async function newTaskDialog() {
     }
     return null;
 }
+
+export async function editTaskDialog(task: any) {
+    let dialog: string;
+    const pluginFolder = await getPluginFolder();
+    
+    const editHandle = Config.DIALOGS.CREATE_TASK + "_edit";
+    if (!HANDLES[editHandle]) {
+        dialog = await joplin.views.dialogs.create(editHandle);
+        HANDLES[editHandle] = dialog;
+        await joplin.views.dialogs.addScript(dialog, path.join(".", "gui", "assets", "css", "new_task_dialog_content_style.css"));
+        await joplin.views.dialogs.addScript(dialog, path.join(".", "gui", "assets", "js", "new_task_dialog_content_script.js"));
+    } else {
+        dialog = HANDLES[editHandle];
+    }
+
+    await joplin.views.dialogs.setButtons(dialog, [
+        {id: "cancel", title: "Cancel"}, 
+        {id: "save", title: "Save Changes"}
+    ]);
+
+    // Load HTML template
+    let html = readFileContent(path.join(pluginFolder, "gui", "assets", "html", "new_task_dialog_content.html")) || "Error loading form";
+    
+    // Customize for Edit
+    html = html.replace('<h1>Create New Task</h1>', '<h1>Edit Task</h1>');
+    
+    // Disable Title and Project
+    html = html.replace('id="taskTitle" name="taskTitle"', `id="taskTitle" name="taskTitle" value="${task.title}" disabled`);
+    
+    // For Project, we just show the one project as disabled
+    const projectOptions = `<option value="${task.projectId}" selected>${task.projectName}</option>`;
+    html = html.replace('id="taskProject" name="taskProject"', `id="taskProject" name="taskProject" disabled`);
+    html = html.replace('<!-- Options will be injected via JS or dynamically generated HTML -->', projectOptions);
+    
+    // Remove the "+" button for project creation in edit mode
+    html = html.replace('<button type="button" id="btnAddNewProject" class="btn-inline-add" title="Create new project">+</button>', '');
+
+    // Pre-fill Due Date
+    if (task.dueDate > 0) {
+        const date = new Date(task.dueDate);
+        // Format to YYYY-MM-DDTHH:mm for datetime-local
+        const isoStr = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+        html = html.replace('id="taskDueDate" name="taskDueDate"', `id="taskDueDate" name="taskDueDate" value="${isoStr}"`);
+    }
+
+    // Pre-fill Urgency
+    const urgency = task.tags.find((t: string) => t.toLowerCase().includes('high')) ? 'high' : 
+                    (task.tags.find((t: string) => t.toLowerCase().includes('low')) ? 'low' : 'normal');
+    
+    if (urgency === 'high') {
+        html = html.replace('value="high"', 'value="high" selected');
+        html = html.replace('value="normal" selected', 'value="normal"');
+    } else if (urgency === 'low') {
+        html = html.replace('value="low"', 'value="low" selected');
+        html = html.replace('value="normal" selected', 'value="normal"');
+    }
+
+    // Subtasks are handled by the script which reads the hidden input value
+    const subTasksStr = task.subTasks.map((st: any) => st.title).join('\n');
+    // Using a safer way to inject value into the hidden field
+    html = html.replace('id="taskSubTasks" name="taskSubTasks" value=""', `id="taskSubTasks" name="taskSubTasks" value="${subTasksStr.replace(/"/g, '&quot;')}"`);
+
+    await joplin.views.dialogs.setHtml(dialog, html);
+
+    const result = await joplin.views.dialogs.open(dialog);
+    
+    if (result.id === "save") {
+        return result.formData?.['taskForm'];
+    }
+    return null;
+}

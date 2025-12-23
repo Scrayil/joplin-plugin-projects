@@ -23,6 +23,14 @@
     const dateInput = document.getElementById('taskDueDate');
     const btnAddNewProject = document.getElementById('btnAddNewProject');
 
+    // Initialize subTasks from hidden input (CRITICAL for Edit mode)
+    if (hiddenInput && hiddenInput.value) {
+        const initialTasks = hiddenInput.value.split('\n');
+        initialTasks.forEach(t => {
+            if (t.trim()) subTasks.push(t.trim());
+        });
+    }
+
     // Function to find and handle the hidden footer button
     function getInternalAddProjectBtn() {
         const buttons = window.parent.document.querySelectorAll('button');
@@ -40,7 +48,7 @@
             clearInterval(hideInterval);
         }
     }, 50);
-    setTimeout(() => clearInterval(hideInterval), 2000); // Safety timeout
+    setTimeout(() => clearInterval(hideInterval), 2000); 
 
     if (btnAddNewProject) {
         btnAddNewProject.addEventListener('click', () => {
@@ -49,7 +57,6 @@
         });
     }
 
-    // Open picker on any click on the date input
     if (dateInput) {
         dateInput.addEventListener('click', () => {
             if (typeof dateInput.showPicker === 'function') {
@@ -60,14 +67,10 @@
 
     function updateList() {
         list.innerHTML = '';
-        
-        // Render at least 5 rows
         const rowsToRender = Math.max(5, subTasks.length);
-        
         for (let i = 0; i < rowsToRender; i++) {
             const task = subTasks[i];
             const isEmpty = i >= subTasks.length;
-            
             const li = document.createElement('li');
             li.className = 'subtask-item' + (isEmpty ? ' empty' : '');
             li.innerHTML = `
@@ -76,8 +79,6 @@
             `;
             list.appendChild(li);
         }
-        
-        // Store only real tasks
         hiddenInput.value = subTasks.join('\n');
     }
 
@@ -108,6 +109,5 @@
         }
     });
 
-    // Initial render
     updateList();
 })();

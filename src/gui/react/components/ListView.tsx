@@ -4,37 +4,32 @@ import { Task } from '../types';
 interface ListViewProps {
     tasks: Task[];
     onOpenNote: (taskId: string) => void;
+    onEditTask: (task: Task) => void;
 }
 
-const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote }) => {
+const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) => {
     const getPriorityValue = (tags: string[]) => {
-        // ... (sorting logic)
         if (tags.some(t => t.toLowerCase().includes('high'))) return 1;
         if (tags.some(t => t.toLowerCase().includes('normal') || t.toLowerCase().includes('medium'))) return 2;
         if (tags.some(t => t.toLowerCase().includes('low'))) return 3;
         return 4;
     };
 
-    // Filter out completed tasks and apply multi-level sort
     const activeTasks = tasks
         .filter(t => t.status !== 'done')
         .sort((a, b) => {
-            // 1. Due Date
             const dateA = a.dueDate ? a.dueDate : Number.MAX_VALUE;
             const dateB = b.dueDate ? b.dueDate : Number.MAX_VALUE;
             if (dateA !== dateB) return dateA - dateB;
 
-            // 2. Priority
             const prioA = getPriorityValue(a.tags);
             const prioB = getPriorityValue(b.tags);
             if (prioA !== prioB) return prioA - prioB;
 
-            // 3. Creation Date
             return a.createdTime - b.createdTime;
         });
 
     const getPriorityDisplay = (tags: string[]) => {
-        // ...
         const priorityTag = tags.find(t => 
             t.toLowerCase().includes('high') || 
             t.toLowerCase().includes('medium') || 
@@ -53,7 +48,6 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote }) => {
     };
 
     const getStatusDisplay = (status: string) => {
-        // ...
         let label = 'To Do';
         let color = '#7f8c8d';
         let bg = 'rgba(127, 140, 141, 0.1)';
@@ -80,7 +74,6 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote }) => {
     };
 
     const formatDate = (timestamp: number, includeTime: boolean = false) => {
-        // ...
         const date = new Date(timestamp);
         const options: Intl.DateTimeFormatOptions = { 
             day: 'numeric', 
@@ -94,7 +87,6 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote }) => {
             options.hour12 = true;
         }
         
-        // Formats to "3 Dec 2025" or "3 Dec 2025 11:24 PM"
         return date.toLocaleDateString('en-GB', options).replace(/,/g, '');
     };
 
@@ -125,11 +117,12 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote }) => {
                         </tr>
                     ) : (
                         activeTasks.map(task => (
-                            <tr key={task.id} style={{ 
-                                borderBottom: '1px solid var(--joplin-divider-color)',
-                                transition: 'background 0.2s',
-                                cursor: 'pointer' // Added cursor
-                            }} className="list-row" onClick={() => onOpenNote(task.id)}> {/* Added onClick */}
+                            <tr key={task.id} 
+                                className="list-row" 
+                                style={{ borderBottom: '1px solid var(--joplin-divider-color)', transition: 'background 0.2s', cursor: 'pointer' }}
+                                onClick={() => onOpenNote(task.id)}
+                                onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
+                            >
                                 <td style={{ padding: '12px 10px', borderRight: '1px solid var(--joplin-divider-color)' }}>
                                     <span style={{ color: 'orange', fontWeight: 'bold' }}>[{task.projectName}]</span>
                                 </td>

@@ -3,7 +3,7 @@ import {getSettingValue} from "../utils/utils";
 import {Config} from "../utils/constants";
 import {createNote} from "../utils/database";
 import {ToastType} from "api/types";
-import {newTaskDialog} from "./dialogs";
+import {newTaskDialog, editTaskDialog} from "./dialogs";
 
 export class TaskDashboard {
     private static instance: TaskDashboard;
@@ -36,6 +36,22 @@ export class TaskDashboard {
         await joplin.views.panels.onMessage(this.panelHandle, async (message: any) => {
             if (message.name === 'getData') {
                 return await this.getDashboardData();
+            }
+            if (message.name === 'openEditTaskDialog') {
+                const task = message.payload.task;
+                const formData = await editTaskDialog(task);
+                if (formData) {
+                    const urgency = formData.taskUrgency;
+                    const dueDateStr = formData.taskDueDate;
+                    const dueDate = dueDateStr ? new Date(dueDateStr).getTime() : 0;
+                    const subTasksStr = formData.taskSubTasks || "";
+                    const subTasks = subTasksStr.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+
+                    await this.updateTask(task.id, { subTasks, urgency, dueDate });
+                    // Trigger refresh
+                    await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
+                }
+                return;
             }
             if (message.name === 'openCreateTaskDialog') {
                 const formData = await newTaskDialog();
@@ -117,6 +133,39 @@ export class TaskDashboard {
         await joplin.views.panels.show(this.panelHandle, !isVisible);
     }
 
+    private async updateTask(taskId: string, payload: { subTasks: string[]; urgency: string; dueDate: number }) {
+        try {
+            // 1. Update Body and Due Date
+            const body = payload.subTasks.map(st => `- [ ] ${st}`).join('\n');
+            await joplin.data.put(['notes', taskId], null, { 
+                body: body,
+                todo_due: payload.dueDate
+            });
+
+            // 2. Update Tags (Urgency)
+            // Remove old urgency tags first
+            const oldTags = await joplin.data.get(['notes', taskId, 'tags'], { fields: ['id', 'title'] });
+            for (const tag of oldTags.items) {
+                if (tag.title.includes('High') || tag.title.includes('Medium') || tag.title.includes('Low')) {
+                    await joplin.data.delete(['tags', tag.id, 'notes', taskId]);
+                }
+            }
+
+            // Add new urgency tag
+            let tagTitle = '🟡 Medium';
+            if (payload.urgency === 'high') tagTitle = '🔴 High';
+            if (payload.urgency === 'low') tagTitle = '🔵 Low';
+            
+            const tagId = await this.ensureTag(tagTitle);
+            await joplin.data.post(['tags', tagId, 'notes'], null, { id: taskId });
+
+            await joplin.views.dialogs.showToast({ message: "Task updated successfully!", duration: 3000, type: ToastType.Success });
+        } catch (error) {
+            console.error('TaskDashboard: Error in updateTask:', error);
+            await joplin.views.dialogs.showToast({ message: "Error updating task", duration: 3000, type: ToastType.Error });
+        }
+    }
+
     private async updateTaskStatus(payload: { taskId: string, newStatus: string }) {
         const { taskId, newStatus } = payload;
         
@@ -178,12 +227,10 @@ export class TaskDashboard {
         let body = note.body;
         
         // Regex to match the specific subtask line
-        // Escape special regex characters in title
-        const escapedTitle = payload.subTaskTitle.replace(/[.*+?^${}()|[\\]/g, '\\$&');
+        const escapedTitle = payload.subTaskTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         
-        // Pattern: - [ ] Title or - [x] Title
-        // We look for the exact line to swap the box
-        const regex = new RegExp(`^(\s*-\s*\[)([ xX])(\]\s*${escapedTitle}\s*)$`, 'm');
+        // Correctly escaped regex for new RegExp()
+        const regex = new RegExp(`^(\\s*-\\s*\\[)([ xX])(\\]\\s*${escapedTitle}\\s*)$`, 'm');
         
         const match = body.match(regex);
         if (match) {

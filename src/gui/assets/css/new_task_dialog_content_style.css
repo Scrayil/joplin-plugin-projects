@@ -72,6 +72,14 @@ input[type="datetime-local"] {
     border-color: var(--joplin-selected-color);
 }
 
+.form-control:disabled,
+input:disabled,
+select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: rgba(128, 128, 128, 0.1);
+}
+
 .form-row {
     display: flex;
     gap: 15px;

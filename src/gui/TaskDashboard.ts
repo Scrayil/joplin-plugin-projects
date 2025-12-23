@@ -106,6 +106,10 @@ export class TaskDashboard {
                 await joplin.commands.execute('toggleNoteList');
                 return;
             }
+            if (message.name === 'synchronize') {
+                await joplin.commands.execute('synchronize');
+                return;
+            }
             if (message.name === 'toggleMenuBar') {
                 await joplin.commands.execute('toggleMenuBar');
                 return;
@@ -164,7 +168,7 @@ export class TaskDashboard {
             }
 
             // Add new urgency tag
-            let tagTitle = '🟡 Medium';
+            let tagTitle = '🟠 Medium';
             if (payload.urgency === 'high') tagTitle = '🔴 High';
             if (payload.urgency === 'low') tagTitle = '🔵 Low';
             
@@ -311,7 +315,7 @@ export class TaskDashboard {
                     await joplin.data.post(['tags', tagId, 'notes'], null, { id: note.id });
                 }
             } else if (payload.urgency === 'normal') {
-                 const tagId = await this.ensureTag('🟡 Medium');
+                 const tagId = await this.ensureTag('🟠 Medium');
                  await joplin.data.post(['tags', tagId, 'notes'], null, { id: note.id });
             }
             

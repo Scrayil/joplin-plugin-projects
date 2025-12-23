@@ -23,6 +23,17 @@
     const dateInput = document.getElementById('taskDueDate');
     const btnAddNewProject = document.getElementById('btnAddNewProject');
 
+    // Prevent past dates
+    function updateMinDate() {
+        if (dateInput) {
+            const now = new Date();
+            // Format to YYYY-MM-DDTHH:mm for datetime-local
+            const isoStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+            dateInput.min = isoStr;
+        }
+    }
+    updateMinDate();
+
     // Initialize subTasks from hidden input (CRITICAL for Edit mode)
     if (hiddenInput && hiddenInput.value) {
         const initialTasks = hiddenInput.value.split('\n');

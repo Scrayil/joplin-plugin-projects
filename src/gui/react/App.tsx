@@ -73,6 +73,14 @@ const App: React.FC = () => {
         }
     };
 
+    const handleSync = async () => {
+        try {
+            await window.webviewApi.postMessage({ name: 'synchronize' });
+        } catch (error) {
+            console.error("Error triggering sync:", error);
+        }
+    };
+
     const handleToggleLayout = async (type: 'sideBar' | 'noteList' | 'menuBar') => {
         try {
             let messageName = '';
@@ -181,27 +189,47 @@ const App: React.FC = () => {
                     >
                         +
                     </button>
+                    <button 
+                        onClick={handleSync} 
+                        style={{ 
+                            background: 'var(--primary-btn-bg)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '32px',
+                            height: '32px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '1rem',
+                            fontWeight: 'bold'
+                        }}
+                        title="Synchronize"
+                    >
+                        ↻
+                    </button>
                     <div style={{ marginLeft: '10px', display: 'flex', gap: '10px', borderLeft: '1px solid var(--border-color)', paddingLeft: '15px' }}>
                         <button 
                             className="layout-btn"
                             onClick={() => handleToggleLayout('sideBar')}
                             title="Toggle Sidebar"
                         >
-                            📁
+                            📂
                         </button>
                         <button 
                             className="layout-btn"
                             onClick={() => handleToggleLayout('noteList')}
                             title="Toggle Note List"
                         >
-                            📝
+                            📑
                         </button>
                         <button 
                             className="layout-btn"
                             onClick={() => handleToggleLayout('menuBar')}
                             title="Toggle Menu Bar"
                         >
-                            🖥️
+                            🛠️
                         </button>
                     </div>
                 </div>

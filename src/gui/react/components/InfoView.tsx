@@ -42,7 +42,7 @@ const InfoView: React.FC = () => {
                 <p>Tasks in all views are consistently ordered by:</p>
                 <ol style={{ paddingLeft: '25px' }}>
                     <li style={{ marginBottom: '12px' }}><strong>Due Date:</strong> Most urgent deadlines first.</li>
-                    <li style={{ marginBottom: '12px' }}><strong>Priority:</strong> High 🔴 &gt; Normal 🟡 &gt; Low 🔵.</li>
+                    <li style={{ marginBottom: '12px' }}><strong>Priority:</strong> High 🔴 &gt; Normal 🟠 &gt; Low 🔵.</li>
                     <li style={{ marginBottom: '12px' }}><strong>Creation Date:</strong> Oldest tasks first (for same deadline/priority).</li>
                 </ol>
             </section>

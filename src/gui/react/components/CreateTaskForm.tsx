@@ -81,7 +81,7 @@ const CreateTaskForm: React.FC<CreateTaskFormProps> = ({ projects, onCreateTask 
                         onChange={(e) => setUrgency(e.target.value)}
                     >
                         <option value="high">🔴 High</option>
-                        <option value="normal">🟡 Normal</option>
+                        <option value="normal">🟠 Normal</option>
                         <option value="low">🔵 Low</option>
                     </select>
                 </div>

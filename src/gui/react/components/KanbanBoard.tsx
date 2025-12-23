@@ -148,9 +148,9 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStat
     return (
         <DragDropContext onDragEnd={onDragEnd}>
             <div className="kanban-board">
-                {renderColumn('todo', 'To Do')}
-                {renderColumn('in_progress', 'In Progress')}
-                {renderColumn('done', 'Done')}
+                {renderColumn('todo', '⚪ To Do')}
+                {renderColumn('in_progress', '🟡 In Progress')}
+                {renderColumn('done', '🟢 Done')}
             </div>
         </DragDropContext>
     );

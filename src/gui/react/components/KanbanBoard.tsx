@@ -11,18 +11,33 @@ interface KanbanBoardProps {
 
 const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStatus, onToggleSubTask }) => {
     
-    // We categorize tasks for rendering, but DnD needs to know source/destination ID
     const getTasksByStatus = (status: string) => {
         let filteredTasks = [];
         if (status === 'todo') filteredTasks = tasks.filter(t => t.status === 'todo' || t.status === 'overdue');
         else if (status === 'in_progress') filteredTasks = tasks.filter(t => t.status === 'in_progress');
         else if (status === 'done') filteredTasks = tasks.filter(t => t.status === 'done');
         
-        // Sort by Due Date (Ascending), No Due Date last
+        const getPriorityValue = (tags: string[]) => {
+            if (tags.some(t => t.toLowerCase().includes('high'))) return 1;
+            if (tags.some(t => t.toLowerCase().includes('normal') || t.toLowerCase().includes('medium'))) return 2;
+            if (tags.some(t => t.toLowerCase().includes('low'))) return 3;
+            return 4;
+        };
+
+        // Multi-level sort: Due Date (asc) -> Priority (High to Low) -> Creation Date (oldest first)
         return filteredTasks.sort((a, b) => {
+            // 1. Due Date
             const dateA = a.dueDate ? a.dueDate : Number.MAX_VALUE;
             const dateB = b.dueDate ? b.dueDate : Number.MAX_VALUE;
-            return dateA - dateB;
+            if (dateA !== dateB) return dateA - dateB;
+
+            // 2. Priority
+            const prioA = getPriorityValue(a.tags);
+            const prioB = getPriorityValue(b.tags);
+            if (prioA !== prioB) return prioA - prioB;
+
+            // 3. Creation Date
+            return a.createdTime - b.createdTime;
         });
     };
 

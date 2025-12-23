@@ -6,13 +6,29 @@ interface ListViewProps {
 }
 
 const ListView: React.FC<ListViewProps> = ({ tasks }) => {
-    // Filter out completed tasks and sort by due date (ascending)
+    const getPriorityValue = (tags: string[]) => {
+        if (tags.some(t => t.toLowerCase().includes('high'))) return 1;
+        if (tags.some(t => t.toLowerCase().includes('normal') || t.toLowerCase().includes('medium'))) return 2;
+        if (tags.some(t => t.toLowerCase().includes('low'))) return 3;
+        return 4;
+    };
+
+    // Filter out completed tasks and apply multi-level sort
     const activeTasks = tasks
         .filter(t => t.status !== 'done')
         .sort((a, b) => {
+            // 1. Due Date
             const dateA = a.dueDate ? a.dueDate : Number.MAX_VALUE;
             const dateB = b.dueDate ? b.dueDate : Number.MAX_VALUE;
-            return dateA - dateB;
+            if (dateA !== dateB) return dateA - dateB;
+
+            // 2. Priority
+            const prioA = getPriorityValue(a.tags);
+            const prioB = getPriorityValue(b.tags);
+            if (prioA !== prioB) return prioA - prioB;
+
+            // 3. Creation Date
+            return a.createdTime - b.createdTime;
         });
 
     const getPriorityDisplay = (tags: string[]) => {

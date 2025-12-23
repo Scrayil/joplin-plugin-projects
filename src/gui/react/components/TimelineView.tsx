@@ -6,10 +6,30 @@ interface TimelineViewProps {
 }
 
 const TimelineView: React.FC<TimelineViewProps> = ({ tasks }) => {
-    // Filter tasks that have a due date and sort by due date ascending
+    const getPriorityValue = (tags: string[]) => {
+        if (tags.some(t => t.toLowerCase().includes('high'))) return 1;
+        if (tags.some(t => t.toLowerCase().includes('normal') || t.toLowerCase().includes('medium'))) return 2;
+        if (tags.some(t => t.toLowerCase().includes('low'))) return 3;
+        return 4;
+    };
+
+    // Filter tasks that have a due date and apply multi-level sort
     const timelineTasks = tasks
         .filter(t => t.dueDate && t.dueDate > 0)
-        .sort((a, b) => (a.dueDate || 0) - (b.dueDate || 0));
+        .sort((a, b) => {
+            // 1. Due Date
+            const dateA = a.dueDate || 0;
+            const dateB = b.dueDate || 0;
+            if (dateA !== dateB) return dateA - dateB;
+
+            // 2. Priority
+            const prioA = getPriorityValue(a.tags);
+            const prioB = getPriorityValue(b.tags);
+            if (prioA !== prioB) return prioA - prioB;
+
+            // 3. Creation Date
+            return a.createdTime - b.createdTime;
+        });
 
     if (timelineTasks.length === 0) {
         return (

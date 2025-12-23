@@ -46,6 +46,15 @@ const InfoView: React.FC = () => {
                     <li style={{ marginBottom: '12px' }}><strong>Creation Date:</strong> Oldest tasks first (for same deadline/priority).</li>
                 </ol>
             </section>
+
+            <section style={{ marginBottom: '30px' }}>
+                <h3 style={{ color: 'var(--joplin-selected-color)', fontSize: '1.4rem' }}>🔄 Data Sync</h3>
+                <p>The dashboard stays automatically synchronized with your Joplin data:</p>
+                <ul style={{ paddingLeft: '25px' }}>
+                    <li style={{ marginBottom: '12px' }}><strong>External Updates:</strong> Any change made to a note (content, tags, checkboxes) is detected and reflected in the dashboard.</li>
+                    <li style={{ marginBottom: '12px' }}><strong>Periodic Polling:</strong> The dashboard re-fetches all data every <strong>3 seconds</strong> to ensure perfect consistency even if an event is missed.</li>
+                </ul>
+            </section>
         </div>
     );
 };

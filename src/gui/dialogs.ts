@@ -1,5 +1,5 @@
 import joplin from "../../api";
-import {createProject} from "../utils/projects";
+import {createProject, getAllProjects} from "../utils/projects";
 import {ToastType} from "../../api/types";
 import {Config} from "../utils/constants";
 import Logger from "@joplin/utils/Logger";
@@ -44,4 +44,38 @@ export async function newProjectDialog() {
     } else {
         await joplin.views.dialogs.showToast({message: "Project creation canceled", duration: 3000, type: ToastType.Info})
     }
+}
+
+export async function newTaskDialog() {
+    let dialog: string;
+    const pluginFolder = await getPluginFolder();
+    
+    // Always recreate or update HTML to ensure project list is fresh
+    // But we reuse the handle if exists to avoid creating multiple dialogs
+    if (!HANDLES[Config.DIALOGS.CREATE_TASK]) {
+        dialog = await joplin.views.dialogs.create(Config.DIALOGS.CREATE_TASK);
+        HANDLES[Config.DIALOGS.CREATE_TASK] = dialog;
+        await joplin.views.dialogs.setButtons(dialog, [{id: "cancel", title: "Cancel"}, {id: "create", title: "Create Task"}]);
+        await joplin.views.dialogs.addScript(dialog, path.join(".", "gui", "assets", "css", "new_task_dialog_content_style.css"));
+        await joplin.views.dialogs.addScript(dialog, path.join(".", "gui", "assets", "js", "new_task_dialog_content_script.js"));
+    } else {
+        dialog = HANDLES[Config.DIALOGS.CREATE_TASK];
+    }
+
+    // Load HTML template
+    let html = readFileContent(path.join(pluginFolder, "gui", "assets", "html", "new_task_dialog_content.html")) || "Error loading form";
+    
+    // Inject projects
+    const projects = await getAllProjects();
+    const optionsHtml = projects.map((p: any) => `<option value="${p.id}">${p.name}</option>`).join('');
+    html = html.replace('<!-- Options will be injected via JS or dynamically generated HTML -->', optionsHtml);
+
+    await joplin.views.dialogs.setHtml(dialog, html);
+
+    const result = await joplin.views.dialogs.open(dialog);
+    
+    if (result.id === "create") {
+        return result.formData?.['taskForm'];
+    }
+    return null;
 }

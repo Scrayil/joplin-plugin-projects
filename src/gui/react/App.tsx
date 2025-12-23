@@ -5,7 +5,7 @@ import KanbanBoard from './components/KanbanBoard';
 import CreateTaskForm from './components/CreateTaskForm';
 
 const App: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'kanban' | 'calendar' | 'table' | 'new_task'>('kanban');
+    const [activeTab, setActiveTab] = useState<'kanban' | 'calendar' | 'table'>('kanban');
     const [data, setData] = useState<DashboardData>({ projects: [], tasks: [] });
     const [loading, setLoading] = useState(true);
     const [projectFilter, setProjectFilter] = useState<string>('all');
@@ -24,72 +24,49 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        // Theme detection logic
+        // Theme detection logic (omitted for brevity, assume it's there from previous step)
         const updateTheme = () => {
             const textColor = getComputedStyle(document.body).getPropertyValue('--joplin-color').trim();
-            
             let isDark = false;
-            
             if (textColor.startsWith('#')) {
                 const hex = textColor.substring(1);
                 const r = parseInt(hex.substring(0, 2), 16);
                 const g = parseInt(hex.substring(2, 4), 16);
                 const b = parseInt(hex.substring(4, 6), 16);
-                // Calculate luminance
                 const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-                
-                if (brightness > 128) { // Text is light -> Background is Dark
-                    isDark = true;
-                }
+                if (brightness > 128) isDark = true;
             }
-            
             document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
             document.documentElement.style.setProperty('accent-color', 'var(--joplin-selected-color)');
         };
-
         updateTheme();
 
         console.log("App mounted. webviewApi:", window.webviewApi);
         fetchData();
 
-        // Listen for backend updates
         if (window.webviewApi && window.webviewApi.onMessage) {
-            // Notify backend that we are listening
             window.webviewApi.postMessage({ name: 'log', message: 'Frontend: Registering onMessage listener' });
-            
             window.webviewApi.onMessage((message: any) => {
-                // Notify backend that we received a message
                 window.webviewApi.postMessage({ name: 'log', message: `Frontend: Received message ${JSON.stringify(message)}` });
-                
                 if (message.name === 'dataChanged') {
                     console.log('Backend data changed, refreshing...');
                     fetchData();
                 }
             });
-        } else {
-            console.error("webviewApi.onMessage not available");
         }
 
-        // Fallback polling every 3 seconds to ensure sync
-        const interval = setInterval(() => {
-            fetchData();
-        }, 3000);
-
+        const interval = setInterval(() => { fetchData(); }, 3000);
         return () => clearInterval(interval);
     }, [fetchData]);
 
-    const handleCreateTask = async (title: string, projectId: string, subTasks: string[], urgency: string, dueDate: number | undefined) => {
+    const handleOpenCreateTaskDialog = async () => {
         try {
-            await window.webviewApi.postMessage({ 
-                name: 'createTask', 
-                payload: { title, projectId, subTasks, urgency, dueDate } 
-            });
-            // Refresh data
+            await window.webviewApi.postMessage({ name: 'openCreateTaskDialog' });
+            // The dialog handles creation. Backend will trigger 'dataChanged' via onNoteChange or we can refresh manually.
+            // Since onNoteChange is debounced, a manual refresh here might be faster if we wait for the promise.
             await fetchData();
-            // Optionally switch back to kanban
-            setActiveTab('kanban');
         } catch (error) {
-            console.error("Error creating task:", error);
+            console.error("Error opening create task dialog:", error);
         }
     };
 
@@ -97,15 +74,12 @@ const App: React.FC = () => {
         // Optimistic update
         const updatedTasks = data.tasks.map(t => {
             if (t.id === taskId) {
-                // Moving to done: mark all subtasks as completed
-                // Moving out of done: unmark all subtasks
                 let updatedSubTasks = t.subTasks;
                 if (newStatus === 'done') {
                     updatedSubTasks = t.subTasks.map(st => ({ ...st, completed: true }));
                 } else if (t.status === 'done') {
                     updatedSubTasks = t.subTasks.map(st => ({ ...st, completed: false }));
                 }
-                
                 return { ...t, status: newStatus as any, subTasks: updatedSubTasks };
             }
             return t;
@@ -113,19 +87,14 @@ const App: React.FC = () => {
         setData({ ...data, tasks: updatedTasks });
 
         try {
-             await window.webviewApi.postMessage({ 
-                name: 'updateTaskStatus', 
-                payload: { taskId, newStatus } 
-            });
-            // We might want to re-fetch to confirm consistency, but optimistic is smoother
+             await window.webviewApi.postMessage({ name: 'updateTaskStatus', payload: { taskId, newStatus } });
         } catch (error) {
             console.error("Error updating status:", error);
-            fetchData(); // Revert on error
+            fetchData();
         }
     };
 
     const handleToggleSubTask = async (taskId: string, subTaskTitle: string, checked: boolean) => {
-         // Optimistic update
          const updatedTasks = data.tasks.map(t => {
              if (t.id === taskId) {
                  const newSubTasks = t.subTasks.map(st => 
@@ -138,17 +107,13 @@ const App: React.FC = () => {
          setData({ ...data, tasks: updatedTasks });
 
          try {
-             await window.webviewApi.postMessage({ 
-                name: 'toggleSubTask', 
-                payload: { taskId, subTaskTitle, checked } 
-            });
+             await window.webviewApi.postMessage({ name: 'toggleSubTask', payload: { taskId, subTaskTitle, checked } });
         } catch (error) {
             console.error("Error toggling subtask:", error);
             fetchData();
         }
     };
 
-    // Filter tasks based on selected project
     const displayedTasks = projectFilter === 'all' 
         ? data.tasks 
         : data.tasks.filter(t => t.projectId === projectFilter);
@@ -174,12 +139,11 @@ const App: React.FC = () => {
                         <h1>Project Tasks</h1>
                     )}
                     <button 
-                        onClick={() => setActiveTab('new_task')} 
-                        className={activeTab === 'new_task' ? 'active' : ''}
+                        onClick={handleOpenCreateTaskDialog} 
                         style={{ 
-                            background: activeTab === 'new_task' ? 'var(--primary-color)' : 'transparent',
-                            color: activeTab === 'new_task' ? 'white' : 'var(--text-color)',
-                            border: '1px solid #ddd',
+                            background: 'var(--primary-btn-bg)',
+                            color: 'white',
+                            border: 'none',
                             borderRadius: '50%',
                             width: '32px',
                             height: '32px',
@@ -209,11 +173,6 @@ const App: React.FC = () => {
                     onUpdateStatus={handleUpdateStatus}
                     onToggleSubTask={handleToggleSubTask}
                 />}
-                {activeTab === 'new_task' && (
-                    <div className="centered-view">
-                        <CreateTaskForm projects={data.projects} onCreateTask={handleCreateTask} />
-                    </div>
-                )}
                 {activeTab === 'calendar' && <div>Calendar View (Coming Soon)</div>}
                 {activeTab === 'table' && <div>Table View (Coming Soon)</div>}
             </div>

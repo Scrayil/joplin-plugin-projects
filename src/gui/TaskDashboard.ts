@@ -3,6 +3,7 @@ import {getSettingValue} from "../utils/utils";
 import {Config} from "../utils/constants";
 import {createNote} from "../utils/database";
 import {ToastType} from "api/types";
+import {newTaskDialog} from "./dialogs";
 
 export class TaskDashboard {
     private static instance: TaskDashboard;
@@ -35,6 +36,26 @@ export class TaskDashboard {
         await joplin.views.panels.onMessage(this.panelHandle, async (message: any) => {
             if (message.name === 'getData') {
                 return await this.getDashboardData();
+            }
+            if (message.name === 'openCreateTaskDialog') {
+                const formData = await newTaskDialog();
+                if (formData) {
+                    // Parse form data
+                    const title = formData.taskTitle;
+                    const projectId = formData.taskProject;
+                    const urgency = formData.taskUrgency;
+                    const dueDateStr = formData.taskDueDate; // "YYYY-MM-DDTHH:mm"
+                    const dueDate = dueDateStr ? new Date(dueDateStr).getTime() : undefined;
+                    
+                    const subTasksStr = formData.taskSubTasks || "";
+                    const subTasks = subTasksStr.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+
+                    await this.createTask({ title, projectId, subTasks, urgency, dueDate });
+                    // Trigger refresh
+                    await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
+                    return;
+                }
+                return;
             }
             if (message.name === 'createTask') {
                 return await this.createTask(message.payload);
@@ -99,7 +120,7 @@ export class TaskDashboard {
              // Regex to replace - [ ] with - [x]
              newBody = note.body.replace(/- \[ \]/g, '- [x]');
         } else {
-             // Moving out of done: uncheck all subtasks as requested
+             // Moving out of done: uncheck all subtasks
              newBody = note.body.replace(/- \[[xX]\]/g, '- [ ]');
         }
 
@@ -142,11 +163,11 @@ export class TaskDashboard {
         
         // Regex to match the specific subtask line
         // Escape special regex characters in title
-        const escapedTitle = payload.subTaskTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedTitle = payload.subTaskTitle.replace(/[.*+?^${}()|[\\]/g, '\\$&');
         
         // Pattern: - [ ] Title or - [x] Title
         // We look for the exact line to swap the box
-        const regex = new RegExp(`^(\\s*-\\s*\\[)([ xX])(\\]\\s*${escapedTitle}\\s*)$`, 'm');
+        const regex = new RegExp(`^(\s*-\s*\[)([ xX])(\]\s*${escapedTitle}\s*)$`, 'm');
         
         const match = body.match(regex);
         if (match) {
@@ -193,6 +214,11 @@ export class TaskDashboard {
 
         const note = await createNote(payload.title, body, true, tasksFolderId);
 
+        // Set due date
+        if (payload.dueDate) {
+            await joplin.data.put(['notes', note.id], null, { todo_due: payload.dueDate });
+        }
+
         // 3. Handle Urgency Tags
         if (payload.urgency && payload.urgency !== 'normal') {
             let tagTitle = '';
@@ -237,14 +263,6 @@ export class TaskDashboard {
     private async fetchAllFolders() {
         // Fetch all folders. fields: id, parent_id, title
         return await this.fetchAllItems(['folders'], { fields: ['id', 'parent_id', 'title'] });
-    }
-
-    private async fetchAllTodos() {
-        // Search for all todos. is_todo:1
-        return await this.fetchAllItems(['search'], { 
-            query: 'is_todo:1', 
-            fields: ['id', 'parent_id', 'title', 'is_todo', 'todo_completed', 'todo_due'] 
-        });
     }
 
     private async fetchNoteTagsMap(): Promise<Map<string, string[]>> {

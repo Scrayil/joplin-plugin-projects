@@ -54,3 +54,21 @@ export async function createProject(projectName: string, projectIcon: string) {
         await createProjectNotebooksAndNotes(projectStructure, projectParentNotebookId);
     }
 }
+
+export async function getAllProjects() {
+    const rootId = await getSettingValue(Config.SETTINGS.PROJECTS_PRIVATE_PARENT_NOTEBOOK_FILE);
+    if (!rootId) return [];
+
+    // Fetch all folders
+    let page = 1;
+    let folders = [];
+    let response;
+    do {
+        response = await joplin.data.get(['folders'], { fields: ['id', 'parent_id', 'title'], page: page, limit: 100 });
+        folders = folders.concat(response.items);
+        page++;
+    } while (response.has_more);
+
+    // Filter direct children of root
+    return folders.filter((f: any) => f.parent_id === rootId).map((p: any) => ({ id: p.id, name: p.title }));
+}

@@ -23,5 +23,6 @@ export const Config = {
 
     DIALOGS: {
         CREATE_PROJECT: PREFIX + "create_new_project_dialog",
+        CREATE_TASK: PREFIX + "create_new_task_dialog",
     },
 } as const;

@@ -3,7 +3,7 @@ import * as React from 'react';
 const InfoView: React.FC = () => {
     return (
         <div className="info-view-container" style={{ 
-            padding: '30px', 
+            padding: '0px',
             height: '100%', 
             overflowY: 'auto',
             background: 'var(--joplin-background-color)',

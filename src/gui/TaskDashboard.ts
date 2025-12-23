@@ -3,7 +3,8 @@ import {getSettingValue} from "../utils/utils";
 import {Config} from "../utils/constants";
 import {createNote} from "../utils/database";
 import {ToastType} from "api/types";
-import {newTaskDialog, editTaskDialog} from "./dialogs";
+import {newTaskDialog, editTaskDialog, newProjectDialog} from "./dialogs";
+import {getAllProjects} from "../utils/projects";
 
 export class TaskDashboard {
     private static instance: TaskDashboard;
@@ -74,6 +75,12 @@ export class TaskDashboard {
                 return;
             }
             if (message.name === 'openCreateTaskDialog') {
+                 const projects = await getAllProjects();
+                 if (projects.length === 0) {
+                    await newProjectDialog();
+                    return;
+                 }
+
                 const formData = await newTaskDialog();
                 if (formData) {
                     // Parse form data

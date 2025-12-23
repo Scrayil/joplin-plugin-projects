@@ -73,9 +73,13 @@ const App: React.FC = () => {
         }
     };
 
-    const handleToggleLayout = async (type: 'sideBar' | 'noteList') => {
+    const handleToggleLayout = async (type: 'sideBar' | 'noteList' | 'menuBar') => {
         try {
-            const messageName = type === 'sideBar' ? 'toggleSideBar' : 'toggleNoteList';
+            let messageName = '';
+            if (type === 'sideBar') messageName = 'toggleSideBar';
+            else if (type === 'noteList') messageName = 'toggleNoteList';
+            else if (type === 'menuBar') messageName = 'toggleMenuBar';
+            
             await window.webviewApi.postMessage({ name: messageName });
         } catch (error) {
             console.error(`Error toggling ${type}:`, error);
@@ -191,6 +195,13 @@ const App: React.FC = () => {
                             title="Toggle Note List"
                         >
                             📝
+                        </button>
+                        <button 
+                            className="layout-btn"
+                            onClick={() => handleToggleLayout('menuBar')}
+                            title="Toggle Menu Bar"
+                        >
+                            🖥️
                         </button>
                     </div>
                 </div>

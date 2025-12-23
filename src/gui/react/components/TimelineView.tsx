@@ -59,18 +59,49 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
     const getPosition = (time: number) => ((time - startRange) / viewDuration) * 100;
     const nowPos = getPosition(now);
 
+    const formatDate = (timestamp: number, includeTime: boolean = false) => {
+        const date = new Date(timestamp);
+        const options: Intl.DateTimeFormatOptions = { 
+            day: 'numeric', 
+            month: 'short', 
+            year: 'numeric' 
+        };
+        
+        if (includeTime) {
+            options.hour = '2-digit';
+            options.minute = '2-digit';
+            options.hour12 = true;
+        }
+        
+        return date.toLocaleDateString('en-GB', options).replace(/,/g, '');
+    };
+
     return (
         <div className="timeline-container" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--joplin-background-color)', overflow: 'hidden', position: 'relative' }}>
-            <div className="timeline-header" style={{ height: '40px', position: 'relative', borderBottom: '1px solid var(--joplin-divider-color)', flexShrink: 0 }}>
-                {[0, 0.25, 0.5, 0.75, 1].map(fraction => {
-                    const time = startRange + (viewDuration * fraction);
-                    return (
-                        <div key={fraction} style={{ position: 'absolute', left: `${fraction * 100}%`, transform: 'translateX(-50%)', fontSize: '0.75rem', color: 'var(--joplin-color)', opacity: 0.6 }}>
-                            {new Date(time).toLocaleDateString()}
+                        <div className="timeline-header" style={{ height: '40px', position: 'relative', borderBottom: '1px solid var(--joplin-divider-color)', flexShrink: 0 }}>
+                            {[0, 0.25, 0.5, 0.75, 1].map(fraction => {
+                                const time = startRange + (viewDuration * fraction);
+                                // Adjust alignment for first and last labels
+                                let transform = 'translateX(-50%)';
+                                if (fraction === 0) transform = 'none';
+                                if (fraction === 1) transform = 'translateX(-100%)';
+            
+                                return (
+                                    <div key={fraction} style={{ 
+                                        position: 'absolute', 
+                                        left: `${fraction * 100}%`, 
+                                        transform: transform,
+                                        fontSize: '0.75rem',
+                                        color: 'var(--joplin-color)',
+                                        opacity: 0.6,
+                                        whiteSpace: 'nowrap',
+                                        padding: '0 5px'
+                                    }}>
+                                        {formatDate(time)}
+                                    </div>
+                                );
+                            })}
                         </div>
-                    );
-                })}
-            </div>
 
             <div className="timeline-body" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
                 <div style={{ position: 'relative', minHeight: '100%', padding: '20px 0' }}>
@@ -89,14 +120,30 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                             <div key={task.id} className="timeline-row" style={{ height: '60px', position: 'relative', borderBottom: '1px solid var(--joplin-divider-color)', margin: '0 10px', cursor: 'pointer' }} 
                                  onClick={() => onOpenNote(task.id)}
                                  onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
-                                 title={`${task.title}\nDue: ${new Date(task.dueDate!).toLocaleString()}`}>
+                                 title={`${task.title}\nDue: ${formatDate(task.dueDate!, true)}`}>
                                 <div style={{ position: 'absolute', left: `${startPos}%`, top: '5px', fontSize: '0.8rem', color: 'var(--joplin-color)', whiteSpace: 'nowrap', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: projectColor, display: 'inline-block', flexShrink: 0 }}></span>
                                     <span style={{ color: 'orange' }}>[{task.projectName}]</span> {task.title}
                                 </div>
                                 <div className={`timeline-bar ${task.status === 'done' ? 'done' : ''}`} style={{ position: 'absolute', left: `${startPos}%`, width: `${width}%`, height: '8px', top: '30px', background: task.status === 'done' ? 'var(--joplin-divider-color)' : projectColor, borderRadius: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', opacity: task.status === 'done' ? 0.5 : 1 }}></div>
-                                <div style={{ position: 'absolute', left: `${startPos}%`, top: '42px', fontSize: '0.65rem', opacity: 0.5 }}>{new Date(task.createdTime).toLocaleDateString()}</div>
-                                <div style={{ position: 'absolute', left: `${endPos}%`, top: '42px', fontSize: '0.65rem', transform: 'translateX(-100%)', opacity: 0.5, textAlign: 'right' }}>{new Date(task.dueDate!).toLocaleDateString()}</div>
+                                <div style={{ 
+                                    position: 'absolute', 
+                                    left: `${startPos}%`, 
+                                    top: '42px', 
+                                    fontSize: '0.65rem', 
+                                    opacity: 0.5,
+                                    whiteSpace: 'nowrap' // Ensure inline
+                                }}>{formatDate(task.createdTime)}</div>
+                                <div style={{ 
+                                    position: 'absolute', 
+                                    left: `${endPos}%`, 
+                                    top: '42px', 
+                                    fontSize: '0.65rem', 
+                                    transform: 'translateX(-100%)', 
+                                    opacity: 0.5, 
+                                    textAlign: 'right',
+                                    whiteSpace: 'nowrap' // Ensure inline
+                                }}>{formatDate(task.dueDate!)}</div>
                             </div>
                         );
                     })}

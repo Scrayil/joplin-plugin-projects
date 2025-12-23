@@ -87,6 +87,19 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStat
         );
     };
 
+    const formatDate = (timestamp: number) => {
+        const date = new Date(timestamp);
+        const options: Intl.DateTimeFormatOptions = { 
+            day: 'numeric', 
+            month: 'short', 
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        };
+        return date.toLocaleDateString('en-GB', options).replace(/,/g, '');
+    };
+
     const renderColumn = (status: string, title: string) => {
         const columnTasks = getTasksByStatus(status);
         return (
@@ -116,7 +129,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStat
                                             </div>
                                             {renderTags(task.tags)}
                                             {renderSubTasks(task)}
-                                            {task.dueDate > 0 && <div className="task-due">Due: {new Date(task.dueDate).toLocaleString()}</div>}
+                                            {task.dueDate > 0 && <div className="task-due">Due: {formatDate(task.dueDate)}</div>}
                                         </div>
                                     )}
                                 </Draggable>

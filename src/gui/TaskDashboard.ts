@@ -106,6 +106,10 @@ export class TaskDashboard {
                 await joplin.commands.execute('toggleNoteList');
                 return;
             }
+            if (message.name === 'toggleMenuBar') {
+                await joplin.commands.execute('toggleMenuBar');
+                return;
+            }
             if (message.name === 'log') {
                 console.log('React Log:', message.message);
                 return;

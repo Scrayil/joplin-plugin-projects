@@ -370,7 +370,7 @@ export class TaskDashboard {
         // Parallel fetching could be faster but might hit API limits. Serial for safety.
         for (const folderId of foldersToScan) {
             const notes = await this.fetchAllItems(['folders', folderId, 'notes'], {
-                fields: ['id', 'parent_id', 'title', 'is_todo', 'todo_completed', 'todo_due', 'body']
+                fields: ['id', 'parent_id', 'title', 'is_todo', 'todo_completed', 'todo_due', 'body', 'created_time']
             });
             
             for (const n of notes) {
@@ -386,9 +386,6 @@ export class TaskDashboard {
                     status = 'done';
                 } else if (tags.some(t => t.toLowerCase() === 'in progress' || t.toLowerCase() === 'doing')) {
                     status = 'in_progress';
-                } else if (n.todo_due && n.todo_due < Date.now()) {
-                    // status = 'overdue'; // Optional: separate overdue status or keep as todo
-                    // We keep it as todo but frontend handles styling
                 }
 
                 dashboardTasks.push({
@@ -396,6 +393,7 @@ export class TaskDashboard {
                     title: n.title,
                     status: status,
                     dueDate: n.todo_due,
+                    createdTime: n.created_time,
                     projectId: project?.id,
                     projectName: project?.name,
                     tags: tags,

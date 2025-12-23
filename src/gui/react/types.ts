@@ -8,6 +8,7 @@ export interface Task {
     title: string;
     status: 'todo' | 'in_progress' | 'done' | 'overdue';
     dueDate?: number;
+    createdTime: number;
     projectId: string;
     projectName: string;
     tags: string[];

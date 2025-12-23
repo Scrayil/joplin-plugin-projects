@@ -3,9 +3,10 @@ import { useState, useEffect } from 'react';
 import { Task, Project, DashboardData } from './types';
 import KanbanBoard from './components/KanbanBoard';
 import CreateTaskForm from './components/CreateTaskForm';
+import TimelineView from './components/TimelineView';
 
 const App: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'kanban' | 'calendar' | 'table'>('kanban');
+    const [activeTab, setActiveTab] = useState<'kanban' | 'timeline' | 'table'>('kanban');
     const [data, setData] = useState<DashboardData>({ projects: [], tasks: [] });
     const [loading, setLoading] = useState(true);
     const [projectFilter, setProjectFilter] = useState<string>('all');
@@ -161,7 +162,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="tabs">
                     <button onClick={() => setActiveTab('kanban')} className={activeTab === 'kanban' ? 'active' : ''}>Kanban</button>
-                    <button onClick={() => setActiveTab('calendar')} className={activeTab === 'calendar' ? 'active' : ''}>Calendar</button>
+                    <button onClick={() => setActiveTab('timeline')} className={activeTab === 'timeline' ? 'active' : ''}>Timeline</button>
                     <button onClick={() => setActiveTab('table')} className={activeTab === 'table' ? 'active' : ''}>List</button>
                 </div>
             </div>
@@ -173,7 +174,7 @@ const App: React.FC = () => {
                     onUpdateStatus={handleUpdateStatus}
                     onToggleSubTask={handleToggleSubTask}
                 />}
-                {activeTab === 'calendar' && <div>Calendar View (Coming Soon)</div>}
+                {activeTab === 'timeline' && <TimelineView tasks={displayedTasks} />}
                 {activeTab === 'table' && <div>Table View (Coming Soon)</div>}
             </div>
         </div>

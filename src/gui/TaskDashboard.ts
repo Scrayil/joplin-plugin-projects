@@ -211,12 +211,8 @@ export class TaskDashboard {
             
             let tasksFolderId = '';
             
-            // Try to find a folder named 'Tasks' or similar
-            const tasksFolder = projectFolders.find((f: any) => 
-                f.title.toLowerCase().includes('tasks') || 
-                f.title.toLowerCase().includes('todo') ||
-                f.title.toLowerCase().includes('to-do')
-            );
+            // Try to find a folder named 'Tasks'
+            const tasksFolder = projectFolders.find((f: any) => f.title.includes('Tasks'));
             
             if (tasksFolder) {
                 console.log('TaskDashboard: Found specific tasks folder:', tasksFolder.title, tasksFolder.id);
@@ -341,15 +337,26 @@ export class TaskDashboard {
         const projectFolders = allFolders.filter((f: any) => f.parent_id === rootId);
         
         // Build a map of FolderID -> Project info
+        // ONLY for folders that are named "Tasks" (or similar) or are children of such folders
         const folderToProjectMap = new Map<string, {id: string, name: string}>();
         
-        const mapFolderToProject = (folderId: string, project: {id: string, name: string}) => {
-            folderToProjectMap.set(folderId, project);
+        const mapFolderToProject = (folderId: string, project: {id: string, name: string}, isInsideTasks: boolean) => {
+            const folder = allFolders.find((f: any) => f.id === folderId);
+            if (!folder) return;
+
+            // STRICTLY look for "Tasks" folder
+            const currentIsTasks = isInsideTasks || folder.title.includes('Tasks');
+
+            if (currentIsTasks) {
+                folderToProjectMap.set(folderId, project);
+            }
+
             const children = allFolders.filter((f: any) => f.parent_id === folderId);
-            children.forEach((c: any) => mapFolderToProject(c.id, project));
+            children.forEach((c: any) => mapFolderToProject(c.id, project, currentIsTasks));
         };
 
-        projectFolders.forEach((p: any) => mapFolderToProject(p.id, { id: p.id, name: p.title }));
+        // Start mapping from each project root, but initially not inside a "Tasks" folder
+        projectFolders.forEach((p: any) => mapFolderToProject(p.id, { id: p.id, name: p.title }, false));
 
         // Fetch Note Tags Map
         const noteTagsMap = await this.fetchNoteTagsMap();

@@ -7,10 +7,12 @@ interface KanbanBoardProps {
     projects: Project[];
     onUpdateStatus: (taskId: string, newStatus: string) => void;
     onToggleSubTask: (taskId: string, subTaskTitle: string, checked: boolean) => void;
+    onOpenNote: (taskId: string) => void;
 }
 
-const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStatus, onToggleSubTask }) => {
+const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStatus, onToggleSubTask, onOpenNote }) => {
     
+    // We categorize tasks for rendering, but DnD needs to know source/destination ID
     const getTasksByStatus = (status: string) => {
         let filteredTasks = [];
         if (status === 'todo') filteredTasks = tasks.filter(t => t.status === 'todo' || t.status === 'overdue');
@@ -83,7 +85,10 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStat
                         <input 
                             type="checkbox" 
                             checked={st.completed} 
-                            onChange={(e) => onToggleSubTask(task.id, st.title, e.target.checked)}
+                            onChange={(e) => {
+                                e.stopPropagation(); // Prevent opening note when clicking checkbox
+                                onToggleSubTask(task.id, st.title, e.target.checked);
+                            }}
                             style={{ cursor: 'pointer' }}
                         />
                         <span style={{ 
@@ -124,7 +129,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStat
                                             ref={provided.innerRef}
                                             {...provided.draggableProps}
                                             {...provided.dragHandleProps}
-                                            style={{ ...provided.draggableProps.style }} // Essential for DnD positioning
+                                            style={{ ...provided.draggableProps.style, cursor: 'pointer' }} // Added cursor
+                                            onClick={() => onOpenNote(task.id)} // Added onClick
                                         >
                                             <div className="task-title">
                                                 <span className="task-project-tag">[{task.projectName}]</span>

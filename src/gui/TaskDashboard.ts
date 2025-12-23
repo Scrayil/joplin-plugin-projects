@@ -78,6 +78,10 @@ export class TaskDashboard {
             if (message.name === 'toggleSubTask') {
                 return await this.toggleSubTask(message.payload);
             }
+            if (message.name === 'openNote') {
+                await joplin.commands.execute('openNote', message.payload.taskId);
+                return;
+            }
             if (message.name === 'log') {
                 console.log('React Log:', message.message);
                 return;

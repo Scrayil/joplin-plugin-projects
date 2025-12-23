@@ -116,6 +116,14 @@ const App: React.FC = () => {
         }
     };
 
+    const handleOpenNote = async (taskId: string) => {
+        try {
+            await window.webviewApi.postMessage({ name: 'openNote', payload: { taskId } });
+        } catch (error) {
+            console.error("Error opening note:", error);
+        }
+    };
+
     const displayedTasks = projectFilter === 'all' 
         ? data.tasks 
         : data.tasks.filter(t => t.projectId === projectFilter);
@@ -125,6 +133,7 @@ const App: React.FC = () => {
     return (
         <div className="dashboard-container">
             <div className="header">
+                {/* ... (header content) ... */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                     {data.projects.length > 1 ? (
                         <select 
@@ -138,7 +147,7 @@ const App: React.FC = () => {
                             ))}
                         </select>
                     ) : (
-                        <h1>Project Tasks</h1>
+                        <h1>All Tasks</h1>
                     )}
                     <button 
                         onClick={handleOpenCreateTaskDialog} 
@@ -174,9 +183,10 @@ const App: React.FC = () => {
                     projects={data.projects} 
                     onUpdateStatus={handleUpdateStatus}
                     onToggleSubTask={handleToggleSubTask}
+                    onOpenNote={handleOpenNote}
                 />}
-                {activeTab === 'timeline' && <TimelineView tasks={displayedTasks} />}
-                {activeTab === 'table' && <ListView tasks={displayedTasks} />}
+                {activeTab === 'timeline' && <TimelineView tasks={displayedTasks} onOpenNote={handleOpenNote} />}
+                {activeTab === 'table' && <ListView tasks={displayedTasks} onOpenNote={handleOpenNote} />}
             </div>
         </div>
     );

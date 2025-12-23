@@ -73,6 +73,15 @@ const App: React.FC = () => {
         }
     };
 
+    const handleToggleLayout = async (type: 'sideBar' | 'noteList') => {
+        try {
+            const messageName = type === 'sideBar' ? 'toggleSideBar' : 'toggleNoteList';
+            await window.webviewApi.postMessage({ name: messageName });
+        } catch (error) {
+            console.error(`Error toggling ${type}:`, error);
+        }
+    };
+
     const handleUpdateStatus = async (taskId: string, newStatus: string) => {
         const updatedTasks = data.tasks.map(t => {
             if (t.id === taskId) {
@@ -168,6 +177,22 @@ const App: React.FC = () => {
                     >
                         +
                     </button>
+                    <div style={{ marginLeft: '10px', display: 'flex', gap: '10px', borderLeft: '1px solid var(--border-color)', paddingLeft: '15px' }}>
+                        <button 
+                            className="layout-btn"
+                            onClick={() => handleToggleLayout('sideBar')}
+                            title="Toggle Sidebar"
+                        >
+                            📁
+                        </button>
+                        <button 
+                            className="layout-btn"
+                            onClick={() => handleToggleLayout('noteList')}
+                            title="Toggle Note List"
+                        >
+                            📝
+                        </button>
+                    </div>
                 </div>
                 <div className="tabs">
                     <button onClick={() => setActiveTab('kanban')} className={activeTab === 'kanban' ? 'active' : ''}>Kanban</button>

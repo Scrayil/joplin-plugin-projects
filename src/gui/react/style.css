@@ -121,27 +121,19 @@ body {
     opacity: 1;
 }
 
-.info-btn {
+.layout-btn {
     background: none;
-    border: 1px solid var(--border-color);
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    border: none;
     cursor: pointer;
-    color: var(--text-color);
-    font-size: 1rem;
-    font-weight: bold;
-    opacity: 0.7;
-    transition: all 0.2s;
+    font-size: 1.1rem;
+    opacity: 0.6;
+    transition: opacity 0.2s, transform 0.1s;
+    padding: 0 5px;
 }
 
-.info-btn:hover {
+.layout-btn:hover {
     opacity: 1;
-    border-color: var(--joplin-selected-color);
-    background: rgba(128, 128, 128, 0.1);
+    transform: scale(1.1);
 }
 
 /* Context Menu */

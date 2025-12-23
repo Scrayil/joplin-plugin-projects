@@ -98,6 +98,14 @@ export class TaskDashboard {
                 await joplin.commands.execute('openNote', message.payload.taskId);
                 return;
             }
+            if (message.name === 'toggleSideBar') {
+                await joplin.commands.execute('toggleSideBar');
+                return;
+            }
+            if (message.name === 'toggleNoteList') {
+                await joplin.commands.execute('toggleNoteList');
+                return;
+            }
             if (message.name === 'log') {
                 console.log('React Log:', message.message);
                 return;

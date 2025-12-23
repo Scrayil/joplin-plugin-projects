@@ -177,7 +177,9 @@ export class TaskDashboard {
     private async updateTaskStatus(payload: { taskId: string, newStatus: string }) {
         const { taskId, newStatus } = payload;
         
-        // 1. Handle completion status
+        // 1. Get current note status to see where we are moving FROM
+        const note = await joplin.data.get(['notes', taskId], { fields: ['body', 'todo_completed'] });
+        const wasCompleted = note.todo_completed > 0;
         const isCompleted = newStatus === 'done';
         
         // Prepare updates
@@ -185,17 +187,16 @@ export class TaskDashboard {
             todo_completed: isCompleted ? Date.now() : 0 
         };
 
-        // Auto-complete subtasks if moving to done
-        // OR Un-complete subtasks if moving out of done
-        const note = await joplin.data.get(['notes', taskId], { fields: ['body'] });
+        // 2. Manage Subtasks checkboxes in the body
         let newBody = note.body;
         if (isCompleted) {
-             // Regex to replace - [ ] with - [x]
+             // Moving TO done: check all subtasks
              newBody = note.body.replace(/- \[ \]/g, '- [x]');
-        } else {
-             // Moving out of done: uncheck all subtasks
+        } else if (wasCompleted) {
+             // Moving OUT OF done: uncheck all subtasks
              newBody = note.body.replace(/- \[[xX]\]/g, '- [ ]');
         }
+        // If moving from Todo to In Progress, both conditions are false, so body is untouched.
 
         if (newBody !== note.body) {
             updates.body = newBody;
@@ -203,8 +204,8 @@ export class TaskDashboard {
 
         await joplin.data.put(['notes', taskId], null, updates);
 
-        // 2. Handle Tags for "In Progress"
-        // We need to find the "In Progress" tag ID first
+        // 3. Handle Tags for "In Progress"
+        // ... (rest of the tags logic remains the same)
         const search = await joplin.data.get(['search'], { query: 'in progress', type: 'tag' });
         let inProgressTagId = '';
         if (search.items.length > 0) {

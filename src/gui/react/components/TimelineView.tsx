@@ -104,7 +104,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                         </div>
 
             <div className="timeline-body" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-                <div style={{ position: 'relative', minHeight: '100%', padding: '20px 0' }}>
+                <div style={{ position: 'relative', minHeight: '100%', padding: '20px 0', boxSizing: 'border-box' }}>
                     <div style={{ position: 'absolute', left: `${nowPos}%`, top: 0, bottom: 0, width: '2px', background: '#ff4757', zIndex: 10, pointerEvents: 'none' }}>
                         <div style={{ position: 'absolute', top: '5px', right: '6px', color: '#ff4757', fontSize: '0.65rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>TODAY</div>
                         <div style={{ position: 'absolute', bottom: '5px', right: '6px', color: '#ff4757', fontSize: '0.65rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>TODAY</div>

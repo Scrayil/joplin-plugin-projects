@@ -35,7 +35,7 @@ const CreateTaskForm: React.FC<CreateTaskFormProps> = ({ projects, onCreateTask 
 
     return (
         <div className="create-task-form">
-            <h2>Create New Task</h2>
+            <h2>New Task</h2>
             
             <div className="form-group">
                 <label>Title</label>

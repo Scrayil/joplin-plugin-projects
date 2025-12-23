@@ -113,6 +113,7 @@ export async function editTaskDialog(task: any) {
 
     await joplin.views.dialogs.setButtons(dialog, [
         {id: "cancel", title: "Cancel"}, 
+        {id: "delete", title: "Delete Task"},
         {id: "save", title: "Save Changes"}
     ]);
 
@@ -120,7 +121,7 @@ export async function editTaskDialog(task: any) {
     let html = readFileContent(path.join(pluginFolder, "gui", "assets", "html", "new_task_dialog_content.html")) || "Error loading form";
     
     // Customize for Edit
-    html = html.replace('<h1>Create New Task</h1>', '<h1>Edit Task</h1>');
+    html = html.replace('<h1>New Task</h1>', '<h1>Edit Task</h1>');
     
     // Disable Title and Project
     html = html.replace('id="taskTitle" name="taskTitle"', `id="taskTitle" name="taskTitle" value="${task.title}" disabled`);
@@ -163,7 +164,10 @@ export async function editTaskDialog(task: any) {
     const result = await joplin.views.dialogs.open(dialog);
     
     if (result.id === "save") {
-        return result.formData?.['taskForm'];
+        return { action: 'save', data: result.formData?.['taskForm'] };
+    }
+    if (result.id === "delete") {
+        return { action: 'delete' };
     }
     return null;
 }

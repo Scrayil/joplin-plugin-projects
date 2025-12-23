@@ -38,18 +38,38 @@ export class TaskDashboard {
                 return await this.getDashboardData();
             }
             if (message.name === 'openEditTaskDialog') {
-                const task = message.payload.task;
-                const formData = await editTaskDialog(task);
-                if (formData) {
-                    const urgency = formData.taskUrgency;
-                    const dueDateStr = formData.taskDueDate;
-                    const dueDate = dueDateStr ? new Date(dueDateStr).getTime() : 0;
-                    const subTasksStr = formData.taskSubTasks || "";
-                    const subTasks = subTasksStr.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+                try {
+                    const task = message.payload.task;
+                    const result = await editTaskDialog(task);
+                    
+                    if (result) {
+                        if (result.action === 'save') {
+                            const formData = result.data;
+                            const urgency = formData.taskUrgency;
+                            const dueDateStr = formData.taskDueDate;
+                            const dueDate = dueDateStr ? new Date(dueDateStr).getTime() : 0;
+                            const subTasksStr = formData.taskSubTasks || "";
+                            const subTasks = subTasksStr.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
 
-                    await this.updateTask(task.id, { subTasks, urgency, dueDate });
-                    // Trigger refresh
-                    await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
+                            await this.updateTask(task.id, { subTasks, urgency, dueDate });
+                        } else if (result.action === 'delete') {
+                            const confirmed = await joplin.views.dialogs.showMessageBox(`Are you sure you want to delete the task "${task.title}"?`);
+                            if (confirmed === 0) {
+                                await joplin.data.delete(['notes', task.id]);
+                                await joplin.views.dialogs.showToast({ message: "Task deleted successfully", duration: 3000, type: ToastType.Success });
+                            } else {
+                                await joplin.views.dialogs.showToast({ message: "Task deletion canceled", duration: 3000, type: ToastType.Info });
+                                return;
+                            }
+                        }
+                        // Trigger refresh
+                        await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
+                    } else {
+                        await joplin.views.dialogs.showToast({ message: "Task edit canceled", duration: 3000, type: ToastType.Info });
+                    }
+                } catch (error) {
+                    console.error('TaskDashboard: Error in edit dialog handler:', error);
+                    await joplin.views.dialogs.showToast({ message: "Error during task edit: " + error.message, duration: 3000, type: ToastType.Error });
                 }
                 return;
             }
@@ -324,7 +344,7 @@ export class TaskDashboard {
 
         } catch (error) {
             console.error('TaskDashboard: Error in createTask:', error);
-            await joplin.views.dialogs.showToast({ message: "Error creating task: " + error.message, duration: 5000, type: ToastType.Error });
+            await joplin.views.dialogs.showToast({ message: "Error creating task: " + error.message, duration: 3000, type: ToastType.Error });
             return { success: false };
         }
     }

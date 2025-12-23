@@ -4,6 +4,7 @@ import { Task, Project, DashboardData } from './types';
 import KanbanBoard from './components/KanbanBoard';
 import CreateTaskForm from './components/CreateTaskForm';
 import TimelineView from './components/TimelineView';
+import ListView from './components/ListView';
 
 const App: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'kanban' | 'timeline' | 'table'>('kanban');
@@ -175,7 +176,7 @@ const App: React.FC = () => {
                     onToggleSubTask={handleToggleSubTask}
                 />}
                 {activeTab === 'timeline' && <TimelineView tasks={displayedTasks} />}
-                {activeTab === 'table' && <div>Table View (Coming Soon)</div>}
+                {activeTab === 'table' && <ListView tasks={displayedTasks} />}
             </div>
         </div>
     );

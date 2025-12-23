@@ -116,44 +116,47 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
                             </td>
                         </tr>
                     ) : (
-                        activeTasks.map(task => (
-                            <tr key={task.id} 
-                                className="list-row" 
-                                style={{ borderBottom: '1px solid var(--joplin-divider-color)', transition: 'background 0.2s', cursor: 'pointer' }}
-                                onClick={() => onOpenNote(task.id)}
-                                onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
-                            >
-                                <td style={{ padding: '12px 10px', borderRight: '1px solid var(--joplin-divider-color)' }}>
-                                    <span style={{ color: 'orange', fontWeight: 'bold' }}>[{task.projectName}]</span>
-                                </td>
-                                <td style={{ 
-                                    padding: '12px 10px', 
-                                    fontWeight: '500', 
-                                    borderRight: '1px solid var(--joplin-divider-color)',
-                                    maxWidth: '350px',
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis'
-                                }} title={task.title}>
-                                    {task.title}
-                                </td>
-                                <td style={{ padding: '12px 10px', borderRight: '1px solid var(--joplin-divider-color)' }}>
-                                    {getStatusDisplay(task.status)}
-                                </td>
-                                <td style={{ padding: '12px 10px', borderRight: '1px solid var(--joplin-divider-color)' }}>
-                                    {getPriorityDisplay(task.tags)}
-                                </td>
-                                <td style={{ padding: '12px 10px', fontSize: '0.85rem' }}>
-                                    {task.dueDate && task.dueDate > 0 ? (
-                                        <span style={{ color: task.dueDate < Date.now() ? '#e74c3c' : 'inherit', fontWeight: task.dueDate < Date.now() ? 'bold' : 'normal' }}>
-                                            {formatDate(task.dueDate, true)}
-                                        </span>
-                                    ) : (
-                                        <span style={{ opacity: 0.3 }}>-</span>
-                                    )}
-                                </td>
-                            </tr>
-                        ))
+                        activeTasks.map(task => {
+                            const isOverdue = task.dueDate > 0 && task.dueDate < Date.now() && task.status !== 'done';
+                            return (
+                                <tr key={task.id} 
+                                    className={`list-row ${isOverdue ? 'overdue' : ''}`} 
+                                    style={{ borderBottom: '1px solid var(--joplin-divider-color)', transition: 'background 0.2s', cursor: 'pointer' }}
+                                    onClick={() => onOpenNote(task.id)}
+                                    onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
+                                >
+                                    <td style={{ padding: '12px 10px', borderRight: '1px solid var(--joplin-divider-color)' }}>
+                                        <span style={{ color: 'orange', fontWeight: 'bold' }}>[{task.projectName}]</span>
+                                    </td>
+                                    <td style={{ 
+                                        padding: '12px 10px', 
+                                        fontWeight: '500', 
+                                        borderRight: '1px solid var(--joplin-divider-color)',
+                                        maxWidth: '350px',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis'
+                                    }} title={task.title}>
+                                        {task.title}
+                                    </td>
+                                    <td style={{ padding: '12px 10px', borderRight: '1px solid var(--joplin-divider-color)' }}>
+                                        {getStatusDisplay(task.status)}
+                                    </td>
+                                    <td style={{ padding: '12px 10px', borderRight: '1px solid var(--joplin-divider-color)' }}>
+                                        {getPriorityDisplay(task.tags)}
+                                    </td>
+                                    <td style={{ padding: '12px 10px', fontSize: '0.85rem' }}>
+                                        {task.dueDate && task.dueDate > 0 ? (
+                                            <span style={{ color: task.dueDate < Date.now() ? '#e74c3c' : 'inherit', fontWeight: task.dueDate < Date.now() ? 'bold' : 'normal' }}>
+                                                {formatDate(task.dueDate, true)}
+                                            </span>
+                                        ) : (
+                                            <span style={{ opacity: 0.3 }}>-</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })
                     )}
                 </tbody>
             </table>

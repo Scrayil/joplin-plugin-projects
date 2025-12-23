@@ -289,6 +289,19 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     text-decoration: line-through;
 }
 
+.task-card.overdue {
+    background-color: rgba(231, 76, 60, 0.15) !important;
+    border-color: rgba(231, 76, 60, 0.4) !important;
+}
+
+.list-row.overdue {
+    background-color: rgba(231, 76, 60, 0.1) !important;
+}
+
+.timeline-row.overdue {
+    background-color: rgba(231, 76, 60, 0.05) !important;
+}
+
 .task-meta {
     font-size: 0.85rem;
     font-weight: 500;

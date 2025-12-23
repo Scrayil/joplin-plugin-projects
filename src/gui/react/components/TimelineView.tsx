@@ -115,9 +115,10 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                         const endPos = getPosition(task.dueDate || task.createdTime);
                         const width = Math.max(endPos - startPos, 0.5);
                         const projectColor = getProjectColor(task.projectId);
+                        const isOverdue = task.dueDate! > 0 && task.dueDate! < Date.now() && task.status !== 'done';
 
                         return (
-                            <div key={task.id} className="timeline-row" style={{ height: '60px', position: 'relative', borderBottom: '1px solid var(--joplin-divider-color)', margin: '0 10px', cursor: 'pointer' }} 
+                            <div key={task.id} className={`timeline-row ${isOverdue ? 'overdue' : ''}`} style={{ height: '60px', position: 'relative', borderBottom: '1px solid var(--joplin-divider-color)', margin: '0 10px', cursor: 'pointer' }} 
                                  onClick={() => onOpenNote(task.id)}
                                  onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
                                  title={`${task.title}\nDue: ${formatDate(task.dueDate!, true)}`}>
@@ -125,7 +126,17 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                                     <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: projectColor, display: 'inline-block', flexShrink: 0 }}></span>
                                     <span style={{ color: 'orange' }}>[{task.projectName}]</span> {task.title}
                                 </div>
-                                <div className={`timeline-bar ${task.status === 'done' ? 'done' : ''}`} style={{ position: 'absolute', left: `${startPos}%`, width: `${width}%`, height: '8px', top: '30px', background: task.status === 'done' ? 'var(--joplin-divider-color)' : projectColor, borderRadius: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', opacity: task.status === 'done' ? 0.5 : 1 }}></div>
+                                <div className={`timeline-bar ${task.status === 'done' ? 'done' : ''}`} style={{ 
+                                    position: 'absolute', 
+                                    left: `${startPos}%`, 
+                                    width: `${width}%`, 
+                                    height: '8px', 
+                                    top: '30px', 
+                                    background: task.status === 'done' ? 'var(--joplin-divider-color)' : projectColor, 
+                                    borderRadius: '4px', 
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)', 
+                                    opacity: task.status === 'done' ? 0.5 : 1 
+                                }}></div>
                                 <div style={{ 
                                     position: 'absolute', 
                                     left: `${startPos}%`, 

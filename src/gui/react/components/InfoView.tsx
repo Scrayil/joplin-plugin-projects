@@ -48,6 +48,11 @@ const InfoView: React.FC = () => {
             </section>
 
             <section style={{ marginBottom: '30px' }}>
+                <h3 style={{ color: 'var(--joplin-selected-color)', fontSize: '1.4rem' }}>⏰ Overdue Tasks</h3>
+                <p>Tasks that have passed their deadline and are not yet completed are highlighted with a <strong>semi-transparent red background</strong> in all views (Kanban cards, Timeline rows, and List items) to signal urgency.</p>
+            </section>
+
+            <section style={{ marginBottom: '30px' }}>
                 <h3 style={{ color: 'var(--joplin-selected-color)', fontSize: '1.4rem' }}>🔄 Data Sync</h3>
                 <p>The dashboard stays automatically synchronized with your Joplin data:</p>
                 <ul style={{ paddingLeft: '25px' }}>

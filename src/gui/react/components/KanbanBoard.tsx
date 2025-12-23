@@ -111,29 +111,32 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStat
                             <span className="count-badge">{columnTasks.length}</span>
                         </div>
                         <div className="task-list">
-                            {columnTasks.map((task, index) => (
-                                <Draggable key={task.id} draggableId={task.id} index={index}>
-                                    {(provided) => (
-                                        <div 
-                                            className={`task-card ${status === 'done' ? 'done' : ''}`}
-                                            ref={provided.innerRef}
-                                            {...provided.draggableProps}
-                                            {...provided.dragHandleProps}
-                                            style={{ ...provided.draggableProps.style, cursor: 'pointer' }}
-                                            onClick={() => onOpenNote(task.id)}
-                                            onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
-                                        >
-                                            <div className="task-title">
-                                                <span className="task-project-tag">[{task.projectName}]</span>
-                                                {task.title}
+                            {columnTasks.map((task, index) => {
+                                const isOverdue = task.dueDate > 0 && task.dueDate < Date.now() && task.status !== 'done';
+                                return (
+                                    <Draggable key={task.id} draggableId={task.id} index={index}>
+                                        {(provided) => (
+                                            <div 
+                                                className={`task-card ${status === 'done' ? 'done' : ''} ${isOverdue ? 'overdue' : ''}`}
+                                                ref={provided.innerRef}
+                                                {...provided.draggableProps}
+                                                {...provided.dragHandleProps}
+                                                style={{ ...provided.draggableProps.style, cursor: 'pointer' }}
+                                                onClick={() => onOpenNote(task.id)}
+                                                onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
+                                            >
+                                                <div className="task-title">
+                                                    <span className="task-project-tag">[{task.projectName}]</span>
+                                                    {task.title}
+                                                </div>
+                                                {renderTags(task.tags)}
+                                                {renderSubTasks(task)}
+                                                {task.dueDate > 0 && <div className="task-due">Due: {formatDate(task.dueDate)}</div>}
                                             </div>
-                                            {renderTags(task.tags)}
-                                            {renderSubTasks(task)}
-                                            {task.dueDate > 0 && <div className="task-due">Due: {formatDate(task.dueDate)}</div>}
-                                        </div>
-                                    )}
-                                </Draggable>
-                            ))}
+                                        )}
+                                    </Draggable>
+                                );
+                            })}
                             {provided.placeholder}
                         </div>
                     </div>

@@ -1,17 +1,28 @@
 import joplin from 'api';
-import {getSettingValue} from "../utils/utils";
-import {Config} from "../utils/constants";
-import {createNote} from "../utils/database";
-import {ToastType} from "api/types";
-import {newTaskDialog, editTaskDialog, newProjectDialog} from "./dialogs";
-import {getAllProjects} from "../utils/projects";
+import { ToastType } from "api/types";
+import { Config } from "../utils/constants";
+import { createNote } from "../utils/database";
+import { newTaskDialog, editTaskDialog, newProjectDialog } from "./dialogs";
+import { getAllProjects } from "../utils/projects";
+
+// Services
+import { NoteParser } from '../services/NoteParser';
+import { TagService } from '../services/TagService';
+import { ProjectService } from '../services/ProjectService';
 
 export class TaskDashboard {
     private static instance: TaskDashboard;
     private panelHandle: string;
+    
+    private noteParser: NoteParser;
+    private tagService: TagService;
+    private projectService: ProjectService;
 
     private constructor() {
         this.panelHandle = '';
+        this.noteParser = new NoteParser();
+        this.tagService = new TagService();
+        this.projectService = new ProjectService();
     }
 
     public static getInstance(): TaskDashboard {
@@ -24,150 +35,68 @@ export class TaskDashboard {
     public async register() {
         this.panelHandle = await joplin.views.panels.create('projects_task_dashboard');
         
-        // Initial HTML just to hold the root
         await joplin.views.panels.setHtml(this.panelHandle, `
             <div id="root"></div>
         `);
 
-        // Add the CSS and JS
         await joplin.views.panels.addScript(this.panelHandle, './gui/react/style.css');
         await joplin.views.panels.addScript(this.panelHandle, './gui/react/index.js');
 
-        // Handle messages from the React app
         await joplin.views.panels.onMessage(this.panelHandle, async (message: any) => {
-            if (message.name === 'getData') {
-                return await this.getDashboardData();
-            }
-            if (message.name === 'openEditTaskDialog') {
-                try {
-                    const task = message.payload.task;
-                    const result = await editTaskDialog(task);
-                    
-                    if (result) {
-                        if (result.action === 'save') {
-                            const formData = result.data;
-                            const urgency = formData.taskUrgency;
-                            const dueDateStr = formData.taskDueDate;
-                            const dueDate = dueDateStr ? new Date(dueDateStr).getTime() : 0;
-                            const subTasksStr = formData.taskSubTasks || "";
-                            const subTasks = subTasksStr.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
-
-                            await this.updateTask(task.id, { subTasks, urgency, dueDate });
-                        } else if (result.action === 'delete') {
-                            const confirmed = await joplin.views.dialogs.showMessageBox(`Are you sure you want to delete the task "${task.title}"?`);
-                            if (confirmed === 0) {
-                                await joplin.data.delete(['notes', task.id]);
-                                await joplin.views.dialogs.showToast({ message: "Task deleted successfully", duration: 3000, type: ToastType.Success });
-                            } else {
-                                await joplin.views.dialogs.showToast({ message: "Task deletion canceled", duration: 3000, type: ToastType.Info });
-                                return;
-                            }
-                        }
-                        // Trigger refresh
-                        await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
-                    } else {
-                        await joplin.views.dialogs.showToast({ message: "Task edit canceled", duration: 3000, type: ToastType.Info });
-                    }
-                } catch (error) {
-                    console.error('TaskDashboard: Error in edit dialog handler:', error);
-                    await joplin.views.dialogs.showToast({ message: "Error during task edit: " + error.message, duration: 3000, type: ToastType.Error });
+            try {
+                if (message.name === 'getData') {
+                    return await this.projectService.getDashboardData();
                 }
-                return;
-            }
-            if (message.name === 'openCreateTaskDialog') {
-                 const projects = await getAllProjects();
-                 if (projects.length === 0) {
-                    await newProjectDialog();
-                    return;
-                 }
-
-                const formData = await newTaskDialog();
-                if (formData) {
-                    // Parse form data
-                    const title = formData.taskTitle;
-                    const projectId = formData.taskProject;
-                    
-                    if (!title || title.trim().length === 0) {
-                        await joplin.views.dialogs.showToast({ message: "Task title required", duration: 3000, type: ToastType.Error });
-                        return;
-                    }
-
-                    const urgency = formData.taskUrgency;
-                    const dueDateStr = formData.taskDueDate; // "YYYY-MM-DDTHH:mm"
-                    const dueDate = dueDateStr ? new Date(dueDateStr).getTime() : undefined;
-                    
-                    const subTasksStr = formData.taskSubTasks || "";
-                    const subTasks = subTasksStr.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
-
-                    await this.createTask({ title, projectId, subTasks, urgency, dueDate });
-                    // No need for redundant toast if createTask already shows one, but 
-                    // consistent with newProjectDialog we can handle it here or ensure createTask is silent.
-                    // Currently createTask shows a toast, so we are good.
-                    
-                    // Trigger refresh
-                    await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
-                    return;
-                } else {
-                    await joplin.views.dialogs.showToast({ message: "Task creation canceled", duration: 3000, type: ToastType.Info });
+                if (message.name === 'openEditTaskDialog') {
+                    return await this.handleEditTaskDialog(message.payload.task);
                 }
-                return;
-            }
-            if (message.name === 'createTask') {
-                return await this.createTask(message.payload);
-            }
-            if (message.name === 'updateTaskStatus') {
-                return await this.updateTaskStatus(message.payload);
-            }
-            if (message.name === 'toggleSubTask') {
-                return await this.toggleSubTask(message.payload);
-            }
-            if (message.name === 'openNote') {
-                await joplin.commands.execute('openNote', message.payload.taskId);
-                return;
-            }
-            if (message.name === 'toggleSideBar') {
-                await joplin.commands.execute('toggleSideBar');
-                return;
-            }
-            if (message.name === 'toggleNoteList') {
-                await joplin.commands.execute('toggleNoteList');
-                return;
-            }
-            if (message.name === 'synchronize') {
-                await joplin.commands.execute('synchronize');
-                return;
-            }
-            if (message.name === 'toggleMenuBar') {
-                await joplin.commands.execute('toggleMenuBar');
-                return;
-            }
-            if (message.name === 'log') {
-                console.log('React Log:', message.message);
-                return;
+                if (message.name === 'openCreateTaskDialog') {
+                    return await this.handleCreateTaskDialog();
+                }
+                if (message.name === 'createTask') {
+                    return await this.createTask(message.payload);
+                }
+                if (message.name === 'updateTaskStatus') {
+                    return await this.updateTaskStatus(message.payload);
+                }
+                if (message.name === 'toggleSubTask') {
+                    return await this.toggleSubTask(message.payload);
+                }
+                
+                // Simple pass-through commands
+                if (['openNote', 'toggleSideBar', 'toggleNoteList', 'synchronize', 'toggleMenuBar'].includes(message.name)) {
+                     const commandArgs = message.payload?.taskId ? [message.payload.taskId] : [];
+                     await joplin.commands.execute(message.name, ...commandArgs);
+                     return;
+                }
+                
+                if (message.name === 'log') {
+                    console.log('React Log:', message.message);
+                    return;
+                }
+            } catch (error) {
+                console.error(`TaskDashboard: Error handling message ${message.name}:`, error);
             }
         });
 
-        // Watch for note changes to update dashboard in real-time
+        this.registerNoteWatcher();
+    }
+
+    private async registerNoteWatcher() {
         let debounceTimer: any = null;
         await joplin.workspace.onNoteChange(async (event) => {
-            console.log('TaskDashboard: onNoteChange event received', event);
             if (debounceTimer) clearTimeout(debounceTimer);
-            
             debounceTimer = setTimeout(async () => {
                 const isVisible = await joplin.views.panels.visible(this.panelHandle);
-                console.log('TaskDashboard: Debounce triggered. Panel visible:', isVisible);
-                
                 if (isVisible) {
                     await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
                 }
-            }, 500); // Debounce for 500ms
+            }, 500); 
         });
     }
 
     public async show() {
-        if (await joplin.views.panels.visible(this.panelHandle)) {
-            return;
-        }
+        if (await joplin.views.panels.visible(this.panelHandle)) return;
         await joplin.views.panels.show(this.panelHandle);
     }
 
@@ -176,179 +105,88 @@ export class TaskDashboard {
         await joplin.views.panels.show(this.panelHandle, !isVisible);
     }
 
-    private async updateTask(taskId: string, payload: { subTasks: string[]; urgency: string; dueDate: number }) {
+    // ---
+
+    private async handleEditTaskDialog(task: any) {
         try {
-            // 1. Update Body and Due Date
-            const body = payload.subTasks.map(st => `- [ ] ${st}`).join('\n');
-            await joplin.data.put(['notes', taskId], null, { 
-                body: body,
-                todo_due: payload.dueDate
-            });
-
-            // 2. Update Tags (Urgency)
-            // Remove old urgency tags first
-            const oldTags = await this.fetchAllItems(['notes', taskId, 'tags'], { fields: ['id', 'title'] });
-            console.log('TaskDashboard: Updating tags. Found existing:', oldTags.map((t: any) => t.title));
+            const result = await editTaskDialog(task);
             
-            for (const tag of oldTags) {
-                const lowerTitle = tag.title.toLowerCase();
-                // Check against all known priority keywords, case-insensitive
-                if (lowerTitle.includes('high') || lowerTitle.includes('medium') || lowerTitle.includes('low') || lowerTitle.includes('normal')) {
-                    console.log(`TaskDashboard: Removing old priority tag: "${tag.title}" (ID: ${tag.id})`);
-                    await joplin.data.delete(['tags', tag.id, 'notes', taskId]);
+            if (result) {
+                if (result.action === 'save') {
+                    const formData = result.data;
+                    const urgency = formData.taskUrgency;
+                    const dueDateStr = formData.taskDueDate;
+                    const dueDate = dueDateStr ? new Date(dueDateStr).getTime() : 0;
+                    const subTasksStr = formData.taskSubTasks || "";
+                    const subTasks = subTasksStr.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+
+                    await this.updateTask(task.id, { subTasks, urgency, dueDate });
+                } else if (result.action === 'delete') {
+                    const confirmed = await joplin.views.dialogs.showMessageBox(`Are you sure you want to delete the task "${task.title}"?`);
+                    if (confirmed === 0) {
+                        await joplin.data.delete(['notes', task.id]);
+                        await joplin.views.dialogs.showToast({ message: "Task deleted successfully", duration: 3000, type: ToastType.Success });
+                    } else {
+                        await joplin.views.dialogs.showToast({ message: "Task deletion canceled", duration: 3000, type: ToastType.Info });
+                        return;
+                    }
                 }
-            }
-
-            // Add new urgency tag
-            let tagTitle = '🟠 Medium';
-            if (payload.urgency === 'high') tagTitle = '🔴 High';
-            if (payload.urgency === 'low') tagTitle = '🔵 Low';
-            
-            const tagId = await this.ensureTag(tagTitle);
-            await joplin.data.post(['tags', tagId, 'notes'], null, { id: taskId });
-
-            await joplin.views.dialogs.showToast({ message: "Task updated successfully!", duration: 3000, type: ToastType.Success });
-        } catch (error) {
-            console.error('TaskDashboard: Error in updateTask:', error);
-            await joplin.views.dialogs.showToast({ message: "Error updating task", duration: 3000, type: ToastType.Error });
-        }
-    }
-
-    private async updateTaskStatus(payload: { taskId: string, newStatus: string }) {
-        const { taskId, newStatus } = payload;
-        
-        // 1. Get current note status to see where we are moving FROM
-        const note = await joplin.data.get(['notes', taskId], { fields: ['body', 'todo_completed'] });
-        const wasCompleted = note.todo_completed > 0;
-        const isCompleted = newStatus === 'done';
-        
-        // Prepare updates
-        const updates: any = {
-            todo_completed: isCompleted ? Date.now() : 0 
-        };
-
-        // 2. Manage Subtasks checkboxes in the body
-        let newBody = note.body;
-        if (isCompleted) {
-             // Moving TO done: check all subtasks
-             newBody = note.body.replace(/- \[ \]/g, '- [x]');
-        } else if (wasCompleted) {
-             // Moving OUT OF done: uncheck all subtasks
-             newBody = note.body.replace(/- \[[xX]\]/g, '- [ ]');
-        }
-        // If moving from Todo to In Progress, both conditions are false, so body is untouched.
-
-        if (newBody !== note.body) {
-            updates.body = newBody;
-        }
-
-        await joplin.data.put(['notes', taskId], null, updates);
-
-        // 3. Handle Tags for "In Progress"
-        // ... (rest of the tags logic remains the same)
-        const search = await joplin.data.get(['search'], { query: 'in progress', type: 'tag' });
-        let inProgressTagId = '';
-        if (search.items.length > 0) {
-            inProgressTagId = search.items[0].id;
-        } else {
-            // Create if likely needed, or just skip if we don't want to force create
-            if (newStatus === 'in_progress') {
-                const newTag = await joplin.data.post(['tags'], null, { title: 'In Progress' });
-                inProgressTagId = newTag.id;
-            }
-        }
-
-        if (inProgressTagId) {
-            if (newStatus === 'in_progress') {
-                // Add tag
-                await joplin.data.post(['tags', inProgressTagId, 'notes'], null, { id: taskId });
+                await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
             } else {
-                // Remove tag
-                await joplin.data.delete(['tags', inProgressTagId, 'notes', taskId]);
+                await joplin.views.dialogs.showToast({ message: "Task edit canceled", duration: 3000, type: ToastType.Info });
             }
+        } catch (error) {
+            console.error('TaskDashboard: Error in edit dialog handler:', error);
+            await joplin.views.dialogs.showToast({ message: "Error: " + error.message, duration: 3000, type: ToastType.Error });
         }
-
-        return { success: true };
     }
 
-    private async toggleSubTask(payload: { taskId: string, subTaskTitle: string, checked: boolean }) {
-        const note = await joplin.data.get(['notes', payload.taskId], { fields: ['body'] });
-        let body = note.body;
-        
-        // Regex to match the specific subtask line
-        const escapedTitle = payload.subTaskTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        
-        // Correctly escaped regex for new RegExp()
-        const regex = new RegExp(`^(\\s*-\\s*\\[)([ xX])(\\]\\s*${escapedTitle}\\s*)$`, 'm');
-        
-        const match = body.match(regex);
-        if (match) {
-            const newMark = payload.checked ? 'x' : ' ';
-            body = body.replace(regex, `$1${newMark}$3`);
-            await joplin.data.put(['notes', payload.taskId], null, { body: body });
-        }
+    private async handleCreateTaskDialog() {
+         const projects = await getAllProjects();
+         if (projects.length === 0) {
+            await newProjectDialog();
+            return;
+         }
 
-        return { success: true };
-    }
+        const formData = await newTaskDialog();
+        if (formData) {
+            const title = formData.taskTitle;
+            const projectId = formData.taskProject;
+            
+            if (!title || title.trim().length === 0) {
+                await joplin.views.dialogs.showToast({ message: "Task title required", duration: 3000, type: ToastType.Error });
+                return;
+            }
 
-    private async ensureTag(title: string): Promise<string> {
-        const search = await joplin.data.get(['search'], { query: title, type: 'tag' });
-        if (search.items.length > 0) {
-            return search.items[0].id;
+            const urgency = formData.taskUrgency;
+            const dueDateStr = formData.taskDueDate; 
+            const dueDate = dueDateStr ? new Date(dueDateStr).getTime() : undefined;
+            const subTasksStr = formData.taskSubTasks || "";
+            const subTasks = subTasksStr.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+
+            await this.createTask({ title, projectId, subTasks, urgency, dueDate });
+            await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
+        } else {
+            await joplin.views.dialogs.showToast({ message: "Task creation canceled", duration: 3000, type: ToastType.Info });
         }
-        const newTag = await joplin.data.post(['tags'], null, { title: title });
-        return newTag.id;
     }
 
     private async createTask(payload: { title: string; projectId: string; subTasks?: string[]; urgency?: string; dueDate?: number }) {
-        console.log('TaskDashboard: Creating task with payload:', payload);
-        
         try {
-            // 1. Get folders inside the project folder to find the "Tasks" subfolder
-            // Correct way to get subfolders: filter 'folders' by parent_id
-            const allFolders = await this.fetchAllFolders();
-            const projectFolders = allFolders.filter((f: any) => f.parent_id === payload.projectId);
-            
-            let tasksFolderId = '';
-            
-            // Try to find a folder named 'Tasks'
-            const tasksFolder = projectFolders.find((f: any) => f.title.includes('Tasks'));
-            
-            if (tasksFolder) {
-                console.log('TaskDashboard: Found specific tasks folder:', tasksFolder.title, tasksFolder.id);
-                tasksFolderId = tasksFolder.id;
-            } else {
-                console.log('TaskDashboard: No tasks folder found, using project root:', payload.projectId);
-                tasksFolderId = payload.projectId;
-            }
-
-            // 2. Prepare body with sub-tasks
-            let body = "";
-            if (payload.subTasks && payload.subTasks.length > 0) {
-                body = payload.subTasks.map(st => `- [ ] ${st}`).join('\n');
-            }
+            const tasksFolderId = await this.projectService.getTasksFolderForProject(payload.projectId);
+            const body = this.noteParser.createBodyFromSubTasks(payload.subTasks || []);
 
             const note = await createNote(payload.title, body, true, tasksFolderId);
-            console.log('TaskDashboard: Note created:', note.id);
 
-            // Set due date
             if (payload.dueDate) {
                 await joplin.data.put(['notes', note.id], null, { todo_due: payload.dueDate });
             }
 
-            // 3. Handle Urgency Tags
-            if (payload.urgency && payload.urgency !== 'normal') {
-                let tagTitle = '';
-                if (payload.urgency === 'high') tagTitle = '🔴 High';
-                if (payload.urgency === 'low') tagTitle = '🔵 Low';
-                
-                if (tagTitle) {
-                    const tagId = await this.ensureTag(tagTitle);
-                    await joplin.data.post(['tags', tagId, 'notes'], null, { id: note.id });
-                }
-            } else if (payload.urgency === 'normal') {
-                 const tagId = await this.ensureTag('🟠 Medium');
-                 await joplin.data.post(['tags', tagId, 'notes'], null, { id: note.id });
+            if (payload.urgency && payload.urgency !== Config.TAGS.KEYWORDS.NORMAL) {
+                await this.tagService.updatePriorityTags(note.id, payload.urgency);
+            } else {
+                // Default to Medium if creating new
+                 await this.tagService.updatePriorityTags(note.id, 'medium');
             }
             
             await joplin.views.dialogs.showToast({ message: "Task created successfully!", duration: 3000, type: ToastType.Success });
@@ -361,132 +199,52 @@ export class TaskDashboard {
         }
     }
 
-    private async fetchAllItems(path: string[], query: any = null) {
-        let page = 1;
-        let items: any[] = [];
-        let response;
-        
-        do {
-            const options: any = { page: page, limit: 100 };
-            if (query) {
-                // For search, options are passed differently depending on endpoint
-                // But joplin.data.get(['search']) uses 'query' param
-                 Object.assign(options, query);
-            }
-
-            response = await joplin.data.get(path, options);
-            items = items.concat(response.items);
-            page++;
-        } while (response.has_more);
-
-        return items;
-    }
-
-    private async fetchAllFolders() {
-        // Fetch all folders. fields: id, parent_id, title
-        return await this.fetchAllItems(['folders'], { fields: ['id', 'parent_id', 'title'] });
-    }
-
-    private parseSubTasks(body: string): { title: string; completed: boolean }[] {
-        const subTasks: { title: string; completed: boolean }[] = [];
-        if (!body) return subTasks;
-
-        const lines = body.split('\n');
-        const regex = /^\s*-\s*\[([ xX])\]\s*(.*)$/;
-
-        for (const line of lines) {
-            const match = line.match(regex);
-            if (match) {
-                subTasks.push({
-                    completed: match[1].toLowerCase() === 'x',
-                    title: match[2].trim()
-                });
-            }
-        }
-        return subTasks;
-    }
-
-    private async getDashboardData() {
-        const rootId = await getSettingValue(Config.SETTINGS.PROJECTS_PRIVATE_PARENT_NOTEBOOK_FILE);
-        
-        if (!rootId) {
-            return { projects: [], tasks: [] };
-        }
-
-        const allFolders = await this.fetchAllFolders();
-        
-        // Identify Project Roots
-        const projectFolders = allFolders.filter((f: any) => f.parent_id === rootId);
-        
-        // Build a map of FolderID -> Project info
-        // ONLY for folders that are named "Tasks" (or similar) or are children of such folders
-        const folderToProjectMap = new Map<string, {id: string, name: string}>();
-        
-        const mapFolderToProject = (folderId: string, project: {id: string, name: string}, isInsideTasks: boolean) => {
-            const folder = allFolders.find((f: any) => f.id === folderId);
-            if (!folder) return;
-
-            // STRICTLY look for "Tasks" folder
-            const currentIsTasks = isInsideTasks || folder.title.includes('Tasks');
-
-            if (currentIsTasks) {
-                folderToProjectMap.set(folderId, project);
-            }
-
-            const children = allFolders.filter((f: any) => f.parent_id === folderId);
-            children.forEach((c: any) => mapFolderToProject(c.id, project, currentIsTasks));
-        };
-
-        // Start mapping from each project root, but initially not inside a "Tasks" folder
-        projectFolders.forEach((p: any) => mapFolderToProject(p.id, { id: p.id, name: p.title }, false));
-
-        // Fetch Tasks directly from folders (bypass Search/FTS for immediate consistency)
-        const dashboardTasks: any[] = [];
-        
-        // We iterate over all folders that belong to a project
-        const foldersToScan = Array.from(folderToProjectMap.keys());
-        
-        // Parallel fetching could be faster but might hit API limits. Serial for safety.
-        for (const folderId of foldersToScan) {
-            const notes = await this.fetchAllItems(['folders', folderId, 'notes'], {
-                fields: ['id', 'parent_id', 'title', 'is_todo', 'todo_completed', 'todo_due', 'body', 'created_time']
+    private async updateTask(taskId: string, payload: { subTasks: string[]; urgency: string; dueDate: number }) {
+        try {
+            const body = this.noteParser.createBodyFromSubTasks(payload.subTasks);
+            await joplin.data.put(['notes', taskId], null, { 
+                body: body,
+                todo_due: payload.dueDate
             });
-            
-            for (const n of notes) {
-                if (!n.is_todo) continue;
 
-                const project = folderToProjectMap.get(n.parent_id);
-                // Fetch tags for this specific note to ensure freshness and correctness
-                const noteTags = await this.fetchAllItems(['notes', n.id, 'tags'], { fields: ['title'] });
-                const tags = noteTags.map((t: any) => t.title);
-                
-                const subTasks = this.parseSubTasks(n.body);
+            await this.tagService.updatePriorityTags(taskId, payload.urgency);
 
-                // Determine Status
-                let status = 'todo';
-                if (n.todo_completed) {
-                    status = 'done';
-                } else if (tags.some((t: string) => t.toLowerCase() === 'in progress' || t.toLowerCase() === 'doing')) {
-                    status = 'in_progress';
-                }
+            await joplin.views.dialogs.showToast({ message: "Task updated successfully!", duration: 3000, type: ToastType.Success });
+        } catch (error) {
+            console.error('TaskDashboard: Error in updateTask:', error);
+            await joplin.views.dialogs.showToast({ message: "Error updating task", duration: 3000, type: ToastType.Error });
+        }
+    }
 
-                dashboardTasks.push({
-                    id: n.id,
-                    title: n.title,
-                    status: status,
-                    dueDate: n.todo_due,
-                    createdTime: n.created_time,
-                    projectId: project?.id,
-                    projectName: project?.name,
-                    tags: tags,
-                    subTasks: subTasks
-                });
-            }
+    private async updateTaskStatus(payload: { taskId: string, newStatus: string }) {
+        const { taskId, newStatus } = payload;
+        
+        const note = await joplin.data.get(['notes', taskId], { fields: ['body', 'todo_completed'] });
+        const isCompleted = newStatus === 'done';
+        
+        const updates: any = {
+            todo_completed: isCompleted ? Date.now() : 0 
+        };
+
+        const newBody = this.noteParser.updateAllSubTasks(note.body, isCompleted);
+        if (newBody !== note.body) {
+            updates.body = newBody;
         }
 
-        return {
-            projects: projectFolders.map((p: any) => ({ id: p.id, name: p.title })),
-            tasks: dashboardTasks
-        };
+        await joplin.data.put(['notes', taskId], null, updates);
+        await this.tagService.updateStatusTags(taskId, newStatus);
+
+        return { success: true };
+    }
+
+    private async toggleSubTask(payload: { taskId: string, subTaskTitle: string, checked: boolean }) {
+        const note = await joplin.data.get(['notes', payload.taskId], { fields: ['body'] });
+        const newBody = this.noteParser.updateSubTaskStatus(note.body, payload.subTaskTitle, payload.checked);
+        
+        if (newBody !== note.body) {
+            await joplin.data.put(['notes', payload.taskId], null, { body: newBody });
+        }
+
+        return { success: true };
     }
 }

@@ -25,4 +25,23 @@ export const Config = {
         CREATE_PROJECT: PREFIX + "create_new_project_dialog",
         CREATE_TASK: PREFIX + "create_new_task_dialog",
     },
+
+    TAGS: {
+        HIGH: '🔴 High',
+        MEDIUM: '🟠 Medium',
+        LOW: '🔵 Low',
+        IN_PROGRESS: 'In Progress',
+        KEYWORDS: {
+            HIGH: 'high',
+            MEDIUM: 'medium',
+            LOW: 'low',
+            NORMAL: 'normal',
+            IN_PROGRESS: 'in progress',
+            DOING: 'doing'
+        }
+    },
+
+    FOLDERS: {
+        TASKS: 'Tasks'
+    }
 } as const;

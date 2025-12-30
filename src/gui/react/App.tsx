@@ -1,8 +1,7 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Task, Project, DashboardData } from './types';
+import { Task, DashboardData } from './types';
 import KanbanBoard from './components/KanbanBoard';
-import CreateTaskForm from './components/CreateTaskForm';
 import TimelineView from './components/TimelineView';
 import ListView from './components/ListView';
 import InfoView from './components/InfoView';

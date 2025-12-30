@@ -4,12 +4,14 @@ import { Config } from "../utils/constants";
 import { createNote } from "../utils/database";
 import { newTaskDialog, editTaskDialog, newProjectDialog } from "./dialogs";
 import { getAllProjects } from "../utils/projects";
-
-// Services
 import { NoteParser } from '../services/NoteParser';
 import { TagService } from '../services/TagService';
 import { ProjectService } from '../services/ProjectService';
 
+/**
+ * Controller class for the Task Dashboard panel.
+ * Handles IPC messages from the React frontend and delegates business logic to specialized services.
+ */
 export class TaskDashboard {
     private static instance: TaskDashboard;
     private panelHandle: string;
@@ -32,6 +34,9 @@ export class TaskDashboard {
         return TaskDashboard.instance;
     }
 
+    /**
+     * Registers the panel view and sets up message listeners.
+     */
     public async register() {
         this.panelHandle = await joplin.views.panels.create('projects_task_dashboard');
         
@@ -63,7 +68,6 @@ export class TaskDashboard {
                     return await this.toggleSubTask(message.payload);
                 }
                 
-                // Simple pass-through commands
                 if (['openNote', 'toggleSideBar', 'toggleNoteList', 'synchronize', 'toggleMenuBar'].includes(message.name)) {
                      const commandArgs = message.payload?.taskId ? [message.payload.taskId] : [];
                      await joplin.commands.execute(message.name, ...commandArgs);
@@ -82,6 +86,10 @@ export class TaskDashboard {
         this.registerNoteWatcher();
     }
 
+    /**
+     * Sets up a listener for global note changes to trigger dashboard updates.
+     * Uses a debounce mechanism to prevent excessive refreshes.
+     */
     private async registerNoteWatcher() {
         let debounceTimer: any = null;
         await joplin.workspace.onNoteChange(async (event) => {
@@ -105,8 +113,9 @@ export class TaskDashboard {
         await joplin.views.panels.show(this.panelHandle, !isVisible);
     }
 
-    // ---
-
+    /**
+     * Handles the dialog flow for editing an existing task.
+     */
     private async handleEditTaskDialog(task: any) {
         try {
             const result = await editTaskDialog(task);
@@ -141,6 +150,9 @@ export class TaskDashboard {
         }
     }
 
+    /**
+     * Handles the dialog flow for creating a new task, including optional project creation.
+     */
     private async handleCreateTaskDialog() {
          const projects = await getAllProjects();
          if (projects.length === 0) {
@@ -185,7 +197,6 @@ export class TaskDashboard {
             if (payload.urgency && payload.urgency !== Config.TAGS.KEYWORDS.NORMAL) {
                 await this.tagService.updatePriorityTags(note.id, payload.urgency);
             } else {
-                // Default to Medium if creating new
                  await this.tagService.updatePriorityTags(note.id, 'medium');
             }
             

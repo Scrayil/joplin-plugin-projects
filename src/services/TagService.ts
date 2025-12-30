@@ -1,12 +1,18 @@
 import joplin from 'api';
 import { Config } from '../utils/constants';
 
+/**
+ * Handles all tag-related operations including retrieval, assignment, and cleanup.
+ * Implements concurrency controls to optimize API usage.
+ */
 export class TagService {
 
     /**
-     * Efficiently fetches tags for a list of note IDs.
-     * Uses Promise.all with concurrency control to avoid overloading the API
-     * while solving the N+1 performance issue of serial fetching.
+     * Retrieves tags for multiple notes in parallel batches.
+     * Uses `Promise.allSettled` to ensure partial failures do not block the entire operation.
+     * 
+     * @param noteIds List of note IDs to fetch tags for.
+     * @returns A Map linking Note IDs to their associated tag titles.
      */
     public async getTagsForNotes(noteIds: string[]): Promise<Map<string, string[]>> {
         const noteTagsMap = new Map<string, string[]>();
@@ -32,8 +38,6 @@ export class TagService {
     }
 
     private async fetchTagsForNote(noteId: string): Promise<{ id: string, tags: string[] }> {
-        // We still have to use the direct endpoint, but parallelizing it makes it much faster
-        // than the previous serial loop.
         const tags = await this.fetchAllItems(['notes', noteId, 'tags'], { fields: ['title'] });
         return {
             id: noteId,
@@ -41,8 +45,11 @@ export class TagService {
         };
     }
 
+    /**
+     * Updates the priority tag for a task.
+     * Performs a robust case-insensitive cleanup of existing priority tags before assigning the new one.
+     */
     public async updatePriorityTags(taskId: string, urgency: string): Promise<void> {
-        // 1. Remove old urgency tags (Robust Case-Insensitive Removal)
         const oldTags = await this.fetchAllItems(['notes', taskId, 'tags'], { fields: ['id', 'title'] });
         
         for (const tag of oldTags) {
@@ -58,19 +65,17 @@ export class TagService {
             }
         }
 
-        // 2. Add new urgency tag
         let tagTitle: string = Config.TAGS.MEDIUM;
         if (urgency === 'high') tagTitle = Config.TAGS.HIGH;
         if (urgency === 'low') tagTitle = Config.TAGS.LOW;
-        
-        // Only 'normal' (medium), 'high', and 'low' add tags. 
-        // If urgency is undefined or other, we default to Medium usually, 
-        // but here we follow the logic that a tag is always applied.
         
         const tagId = await this.ensureTag(tagTitle);
         await joplin.data.post(['tags', tagId, 'notes'], null, { id: taskId });
     }
 
+    /**
+     * Toggles the "In Progress" status tag based on the provided state.
+     */
     public async updateStatusTags(taskId: string, newStatus: string): Promise<void> {
         const search = await joplin.data.get(['search'], { query: Config.TAGS.IN_PROGRESS, type: 'tag' });
         let inProgressTagId = '';
@@ -88,8 +93,11 @@ export class TagService {
             if (newStatus === 'in_progress') {
                 await joplin.data.post(['tags', inProgressTagId, 'notes'], null, { id: taskId });
             } else {
-                // Try to remove it if it exists
-                await joplin.data.delete(['tags', inProgressTagId, 'notes', taskId]);
+                try {
+                    await joplin.data.delete(['tags', inProgressTagId, 'notes', taskId]);
+                } catch (e) {
+                    // Ignore if tag doesn't exist
+                }
             }
         }
     }

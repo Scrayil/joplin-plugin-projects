@@ -12,8 +12,11 @@ const App: React.FC = () => {
     const [data, setData] = useState<DashboardData>({ projects: [], tasks: [] });
     const [loading, setLoading] = useState(true);
     const [projectFilter, setProjectFilter] = useState<string>('all');
+    const isFetching = React.useRef(false);
 
     const fetchData = React.useCallback(async () => {
+        if (isFetching.current) return;
+        isFetching.current = true;
         try {
             const response = await window.webviewApi.postMessage({ name: 'getData' });
             setData(response);
@@ -21,6 +24,7 @@ const App: React.FC = () => {
             console.error('Error fetching data:', error);
         } finally {
             setLoading(false);
+            isFetching.current = false;
         }
     }, []);
 

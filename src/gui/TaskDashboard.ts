@@ -187,9 +187,14 @@ export class TaskDashboard {
 
             // 2. Update Tags (Urgency)
             // Remove old urgency tags first
-            const oldTags = await joplin.data.get(['notes', taskId, 'tags'], { fields: ['id', 'title'] });
-            for (const tag of oldTags.items) {
-                if (tag.title.includes('High') || tag.title.includes('Medium') || tag.title.includes('Low')) {
+            const oldTags = await this.fetchAllItems(['notes', taskId, 'tags'], { fields: ['id', 'title'] });
+            console.log('TaskDashboard: Updating tags. Found existing:', oldTags.map((t: any) => t.title));
+            
+            for (const tag of oldTags) {
+                const lowerTitle = tag.title.toLowerCase();
+                // Check against all known priority keywords, case-insensitive
+                if (lowerTitle.includes('high') || lowerTitle.includes('medium') || lowerTitle.includes('low') || lowerTitle.includes('normal')) {
+                    console.log(`TaskDashboard: Removing old priority tag: "${tag.title}" (ID: ${tag.id})`);
                     await joplin.data.delete(['tags', tag.id, 'notes', taskId]);
                 }
             }
@@ -382,24 +387,6 @@ export class TaskDashboard {
         return await this.fetchAllItems(['folders'], { fields: ['id', 'parent_id', 'title'] });
     }
 
-    private async fetchNoteTagsMap(): Promise<Map<string, string[]>> {
-        const tagMap = new Map<string, string[]>();
-        const allTags = await this.fetchAllItems(['tags'], { fields: ['id', 'title'] });
-        
-        for (const tag of allTags) {
-            // Optimization: Only fetch for tags we care about? 
-            // For now, fetching all tag associations is safer for general usage
-            const taggedNotes = await this.fetchAllItems(['tags', tag.id, 'notes'], { fields: ['id'] });
-            taggedNotes.forEach((n: any) => {
-                if (!tagMap.has(n.id)) {
-                    tagMap.set(n.id, []);
-                }
-                tagMap.get(n.id)!.push(tag.title);
-            });
-        }
-        return tagMap;
-    }
-
     private parseSubTasks(body: string): { title: string; completed: boolean }[] {
         const subTasks: { title: string; completed: boolean }[] = [];
         if (!body) return subTasks;
@@ -453,9 +440,6 @@ export class TaskDashboard {
         // Start mapping from each project root, but initially not inside a "Tasks" folder
         projectFolders.forEach((p: any) => mapFolderToProject(p.id, { id: p.id, name: p.title }, false));
 
-        // Fetch Note Tags Map
-        const noteTagsMap = await this.fetchNoteTagsMap();
-
         // Fetch Tasks directly from folders (bypass Search/FTS for immediate consistency)
         const dashboardTasks: any[] = [];
         
@@ -472,14 +456,17 @@ export class TaskDashboard {
                 if (!n.is_todo) continue;
 
                 const project = folderToProjectMap.get(n.parent_id);
-                const tags = noteTagsMap.get(n.id) || [];
+                // Fetch tags for this specific note to ensure freshness and correctness
+                const noteTags = await this.fetchAllItems(['notes', n.id, 'tags'], { fields: ['title'] });
+                const tags = noteTags.map((t: any) => t.title);
+                
                 const subTasks = this.parseSubTasks(n.body);
 
                 // Determine Status
                 let status = 'todo';
                 if (n.todo_completed) {
                     status = 'done';
-                } else if (tags.some(t => t.toLowerCase() === 'in progress' || t.toLowerCase() === 'doing')) {
+                } else if (tags.some((t: string) => t.toLowerCase() === 'in progress' || t.toLowerCase() === 'doing')) {
                     status = 'in_progress';
                 }
 

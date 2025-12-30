@@ -3,11 +3,6 @@ import joplin from "../../api";
 const PREFIX = "projects_"
 
 export const Config = {
-    SETTINGS: {
-        PROJECTS_PRIVATE_PARENT_NOTEBOOK_FILE: PREFIX + "parent_id.txt",
-        PROJECT_TEMPLATE_PATH: PREFIX + "new_project_template",
-    },
-
     COMMANDS: {
         NEW_PROJECT: PREFIX + 'create_new_project',
         TOGGLE_DASHBOARD: PREFIX + 'toggle_dashboard',

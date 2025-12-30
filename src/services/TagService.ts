@@ -1,19 +1,85 @@
 import joplin from 'api';
 import { Config } from '../utils/constants';
+import { getPluginDataFolder, readFileContent, writeFileContent } from '../utils/utils';
+import * as path from 'path';
+import * as fs from 'fs';
 
 /**
- * Handles all tag-related operations including retrieval, assignment, and cleanup.
- * Implements concurrency controls to optimize API usage.
+ * Handles all tag-related operations including retrieval, assignment, cleanup, and persistence of tag IDs.
  */
 export class TagService {
+    private tagMeta: { [key: string]: string } = {};
+    private metaLoaded = false;
+
+    constructor() {
+        this.loadTagMeta();
+    }
+
+    private async loadTagMeta() {
+        if (this.metaLoaded) return;
+        try {
+            const dataFolder = await getPluginDataFolder();
+            const metaPath = path.join(dataFolder, "tag_meta.json");
+            if (fs.existsSync(metaPath)) {
+                const content = await readFileContent(metaPath);
+                if (content) {
+                    this.tagMeta = JSON.parse(content);
+                }
+            }
+            this.metaLoaded = true;
+        } catch (error) {
+            console.error("TagService: Error loading tag meta", error);
+        }
+    }
+
+    private async saveTagMeta() {
+        try {
+            const dataFolder = await getPluginDataFolder();
+            const metaPath = path.join(dataFolder, "tag_meta.json");
+            await writeFileContent(metaPath, JSON.stringify(this.tagMeta, null, 2));
+        } catch (error) {
+            console.error("TagService: Error saving tag meta", error);
+        }
+    }
 
     /**
-     * Retrieves tags for multiple notes in parallel batches.
-     * Uses `Promise.allSettled` to ensure partial failures do not block the entire operation.
-     * 
-     * @param noteIds List of note IDs to fetch tags for.
-     * @returns A Map linking Note IDs to their associated tag titles.
+     * Resolves the correct Tag ID based on type and default title.
+     * Respects user's manual renaming by trusting the stored ID if valid.
      */
+    private async getEffectiveTagId(type: string, defaultTitle: string): Promise<string> {
+        await this.loadTagMeta();
+
+        let tagId = this.tagMeta[type];
+
+        if (tagId) {
+            try {
+                // Check if tag still exists
+                const tag = await joplin.data.get(['tags', tagId], { fields: ['id'] });
+                if (tag) {
+                    // Tag exists, we use it regardless of its current title
+                    return tagId;
+                }
+            } catch (e) {
+                console.warn(`TagService: Stored tag ${type} (${tagId}) not found. Resetting.`);
+            }
+        }
+
+        // ID not found or invalid. Search by name or create.
+        const search = await joplin.data.get(['search'], { query: defaultTitle, type: 'tag' });
+        if (search.items.length > 0) {
+            tagId = search.items[0].id;
+        } else {
+            const newTag = await joplin.data.post(['tags'], null, { title: defaultTitle });
+            tagId = newTag.id;
+        }
+
+        // Save new mapping
+        this.tagMeta[type] = tagId;
+        await this.saveTagMeta();
+
+        return tagId;
+    }
+
     public async getTagsForNotes(noteIds: string[]): Promise<Map<string, string[]>> {
         const noteTagsMap = new Map<string, string[]>();
         const batchSize = 10;
@@ -28,8 +94,6 @@ export class TagService {
                 if (result.status === 'fulfilled') {
                     const { id, tags } = result.value;
                     noteTagsMap.set(id, tags);
-                } else {
-                    console.error('TagService: Failed to fetch tags for a note', result.reason);
                 }
             });
         }
@@ -45,70 +109,38 @@ export class TagService {
         };
     }
 
-    /**
-     * Updates the priority tag for a task.
-     * Performs a robust case-insensitive cleanup of existing priority tags before assigning the new one.
-     */
     public async updatePriorityTags(taskId: string, urgency: string): Promise<void> {
-        const oldTags = await this.fetchAllItems(['notes', taskId, 'tags'], { fields: ['id', 'title'] });
+        // Resolve all priority tag IDs to ensure we clean up correctly
+        const highId = await this.getEffectiveTagId('HIGH', Config.TAGS.HIGH);
+        const mediumId = await this.getEffectiveTagId('MEDIUM', Config.TAGS.MEDIUM);
+        const lowId = await this.getEffectiveTagId('LOW', Config.TAGS.LOW);
         
-        for (const tag of oldTags) {
-            const lowerTitle = tag.title.toLowerCase();
-            const keys = Config.TAGS.KEYWORDS;
-            
-            if (lowerTitle.includes(keys.HIGH) || 
-                lowerTitle.includes(keys.MEDIUM) || 
-                lowerTitle.includes(keys.LOW) || 
-                lowerTitle.includes(keys.NORMAL)) {
-                
-                await joplin.data.delete(['tags', tag.id, 'notes', taskId]);
-            }
+        // Remove ANY of these tags from the note
+        const idsToRemove = [highId, mediumId, lowId];
+        for (const id of idsToRemove) {
+            try {
+                await joplin.data.delete(['tags', id, 'notes', taskId]);
+            } catch (e) { /* Ignore if not present */ }
         }
 
-        let tagTitle: string = Config.TAGS.MEDIUM;
-        if (urgency === 'high') tagTitle = Config.TAGS.HIGH;
-        if (urgency === 'low') tagTitle = Config.TAGS.LOW;
+        // Add the requested one
+        let targetId = mediumId;
+        if (urgency === 'high') targetId = highId;
+        if (urgency === 'low') targetId = lowId;
         
-        const tagId = await this.ensureTag(tagTitle);
-        await joplin.data.post(['tags', tagId, 'notes'], null, { id: taskId });
+        await joplin.data.post(['tags', targetId, 'notes'], null, { id: taskId });
     }
 
-    /**
-     * Toggles the "In Progress" status tag based on the provided state.
-     */
     public async updateStatusTags(taskId: string, newStatus: string): Promise<void> {
-        const search = await joplin.data.get(['search'], { query: Config.TAGS.IN_PROGRESS, type: 'tag' });
-        let inProgressTagId = '';
-        
-        if (search.items.length > 0) {
-            inProgressTagId = search.items[0].id;
+        const inProgressId = await this.getEffectiveTagId('IN_PROGRESS', Config.TAGS.IN_PROGRESS);
+
+        if (newStatus === 'in_progress') {
+            await joplin.data.post(['tags', inProgressId, 'notes'], null, { id: taskId });
         } else {
-             if (newStatus === 'in_progress') {
-                const newTag = await joplin.data.post(['tags'], null, { title: Config.TAGS.IN_PROGRESS });
-                inProgressTagId = newTag.id;
-             }
+            try {
+                await joplin.data.delete(['tags', inProgressId, 'notes', taskId]);
+            } catch (e) { /* Ignore */ }
         }
-
-        if (inProgressTagId) {
-            if (newStatus === 'in_progress') {
-                await joplin.data.post(['tags', inProgressTagId, 'notes'], null, { id: taskId });
-            } else {
-                try {
-                    await joplin.data.delete(['tags', inProgressTagId, 'notes', taskId]);
-                } catch (e) {
-                    // Ignore if tag doesn't exist
-                }
-            }
-        }
-    }
-
-    public async ensureTag(title: string): Promise<string> {
-        const search = await joplin.data.get(['search'], { query: title, type: 'tag' });
-        if (search.items.length > 0) {
-            return search.items[0].id;
-        }
-        const newTag = await joplin.data.post(['tags'], null, { title: title });
-        return newTag.id;
     }
 
     private async fetchAllItems(path: string[], query: any = null) {

@@ -1,10 +1,11 @@
 import joplin from 'api';
 import { Config } from '../utils/constants';
-import { getSettingValue, getPluginDataFolder, readFileContent } from '../utils/utils';
+import { getPluginDataFolder, readFileContent } from '../utils/utils';
 import { TagService } from './TagService';
 import { NoteParser } from './NoteParser';
 import * as path from 'path';
 import * as fs from 'fs';
+import { PersistenceService } from './PersistenceService';
 
 /**
  * Service responsible for aggregating project data, scanning folders, and maintaining the dashboard state.
@@ -55,7 +56,7 @@ export class ProjectService {
     public async getDashboardData() {
         await this.loadProjectMeta();
 
-        const rootId = await getSettingValue(Config.SETTINGS.PROJECTS_PRIVATE_PARENT_NOTEBOOK_FILE);
+        const rootId = await PersistenceService.getInstance().getValue('projects_root_id');
         
         if (!rootId) {
             return { projects: [], tasks: [] };
@@ -155,7 +156,10 @@ export class ProjectService {
 
         const data = {
             projects: projectFolders.map((p: any) => ({ id: p.id, name: p.title })),
-            tasks: dashboardTasks
+            tasks: dashboardTasks,
+            config: {
+                pollingInterval: 3000 // Hardcoded as per request "Remove the only remaining setting"
+            }
         };
         
         this.dashboardCache = data;

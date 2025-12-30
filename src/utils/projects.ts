@@ -3,11 +3,12 @@ import {Config} from "./constants";
 import {
     readFileContent,
     getPluginFolder,
-    getSettingValue, writeFileContent, getPluginDataFolder, setSettingValue,
+    writeFileContent, getPluginDataFolder
 } from "./utils";
 import * as path from "node:path";
 import {createNote, createNotebook, getNotebookTitleById} from "./database";
 import joplin from "../../api";
+import { PersistenceService } from "../services/PersistenceService";
 
 const logger = Logger.create('Projects: Projects');
 
@@ -61,19 +62,16 @@ async function saveProjectMeta(projectId: string, tasksFolderId: string) {
 
 export async function createProject(projectName: string, projectIcon: string) {
     const defaultTemplateFile = path.join(await getPluginFolder(), "gui", "assets", "project_template.json")
-    let projectTemplateFile = await getSettingValue(Config.SETTINGS.PROJECT_TEMPLATE_PATH);
-    if (!projectTemplateFile) {
-        projectTemplateFile = defaultTemplateFile
-    }
-    const projectTemplate = await readFileContent(projectTemplateFile)
+    const projectTemplate = await readFileContent(defaultTemplateFile)
     if (!projectTemplate) {
-        logger.error(`Unable to load the project template: ${projectTemplateFile}`)
+        logger.error(`Unable to load the project template: ${defaultTemplateFile}`)
     } else {
         const projectStructure = JSON.parse(projectTemplate.replace("<PRJ_ICON> ", projectIcon.length > 0 ? projectIcon + " " : projectIcon).replace("<PRJ_NAME>", projectName))
-        let projectParentNotebookId = await getSettingValue(Config.SETTINGS.PROJECTS_PRIVATE_PARENT_NOTEBOOK_FILE)
+        let projectParentNotebookId = await PersistenceService.getInstance().getValue('projects_root_id');
+        
         if(!projectParentNotebookId || Object.keys(await getNotebookTitleById(projectParentNotebookId)).length === 0) {
             projectParentNotebookId= await createProjectsRoot()
-            await setSettingValue(Config.SETTINGS.PROJECTS_PRIVATE_PARENT_NOTEBOOK_FILE, projectParentNotebookId)
+            await PersistenceService.getInstance().setValue('projects_root_id', projectParentNotebookId)
         }
         
         // Create the top-level project folder first to get its ID
@@ -94,14 +92,13 @@ export async function createProject(projectName: string, projectIcon: string) {
         if (tasksFolderId) {
             await saveProjectMeta(projectRootId, tasksFolderId);
         } else {
-             // If no tasks folder found in template (unlikely), fallback to root
              await saveProjectMeta(projectRootId, projectRootId);
         }
     }
 }
 
 export async function getAllProjects() {
-    const rootId = await getSettingValue(Config.SETTINGS.PROJECTS_PRIVATE_PARENT_NOTEBOOK_FILE);
+    const rootId = await PersistenceService.getInstance().getValue('projects_root_id');
     if (!rootId) return [];
 
     // Fetch all folders

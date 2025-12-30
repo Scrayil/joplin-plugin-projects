@@ -16,7 +16,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
     };
 
     const timelineTasks = tasks
-        .filter(t => t.dueDate && t.dueDate > 0)
+        .filter(t => t.dueDate && t.dueDate > 0 && t.status !== 'done')
         .sort((a, b) => {
             const dateA = a.dueDate || 0;
             const dateB = b.dueDate || 0;
@@ -31,7 +31,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
         return (
             <div className="centered-view">
                 <div style={{ textAlign: 'center', opacity: 0.6 }}>
-                    <h3>No tasks with due dates found.</h3>
+                    <h3>No active tasks with due dates found.</h3>
                     <p>Add a due date to a task to see it in the timeline.</p>
                 </div>
             </div>

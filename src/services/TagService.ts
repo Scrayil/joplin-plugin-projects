@@ -16,10 +16,15 @@ export class TagService {
             const batch = noteIds.slice(i, i + batchSize);
             const promises = batch.map(id => this.fetchTagsForNote(id));
             
-            const results = await Promise.all(promises);
+            const results = await Promise.allSettled(promises);
             
-            results.forEach(({ id, tags }) => {
-                noteTagsMap.set(id, tags);
+            results.forEach(result => {
+                if (result.status === 'fulfilled') {
+                    const { id, tags } = result.value;
+                    noteTagsMap.set(id, tags);
+                } else {
+                    console.error('TagService: Failed to fetch tags for a note', result.reason);
+                }
             });
         }
         

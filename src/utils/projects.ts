@@ -14,19 +14,49 @@ const logger = Logger.create('Projects: Projects');
 type NoteObject = {name: string; content: Array<NoteObject>, is_todo: boolean};
 type NotebookObject = {name:string, children:Array<NotebookObject|NoteObject>};
 
-async function createProjectNotebooksAndNotes(projectStructure: NotebookObject, parent_id: string) {
+async function createProjectNotebooksAndNotes(projectStructure: NotebookObject, parent_id: string): Promise<string | null> {
     const currentNotebookId = (await createNotebook(projectStructure.name, parent_id)).id
+    let tasksFolderId: string | null = null;
+
+    if (projectStructure.name.includes(Config.FOLDERS.TASKS)) {
+        tasksFolderId = currentNotebookId;
+    }
+
     for (const element of projectStructure.children) {
         if ("content" in element) {
             await createNote(element.name, element.content.join("\n"), element.is_todo, currentNotebookId);
         } else {
-            await createProjectNotebooksAndNotes(element, currentNotebookId);
+            const childTaskId = await createProjectNotebooksAndNotes(element, currentNotebookId);
+            if (childTaskId) tasksFolderId = childTaskId;
         }
     }
+    return tasksFolderId;
 }
 
 async function createProjectsRoot() {
     return (await createNotebook("🗂️ Projects", "")).id
+}
+
+async function saveProjectMeta(projectId: string, tasksFolderId: string) {
+    try {
+        const dataFolder = await getPluginDataFolder();
+        const metaPath = path.join(dataFolder, "project_meta.json");
+        let meta = {};
+        
+        const existingContent = await readFileContent(metaPath);
+        if (existingContent) {
+            try {
+                meta = JSON.parse(existingContent);
+            } catch (e) {
+                logger.error("Error parsing project_meta.json", e);
+            }
+        }
+
+        meta[projectId] = tasksFolderId;
+        await writeFileContent(metaPath, JSON.stringify(meta, null, 2));
+    } catch (error) {
+        logger.error("Error saving project meta", error);
+    }
 }
 
 export async function createProject(projectName: string, projectIcon: string) {
@@ -35,7 +65,7 @@ export async function createProject(projectName: string, projectIcon: string) {
     if (!projectTemplateFile) {
         projectTemplateFile = defaultTemplateFile
     }
-    const projectTemplate = readFileContent(projectTemplateFile)
+    const projectTemplate = await readFileContent(projectTemplateFile)
     if (!projectTemplate) {
         logger.error(`Unable to load the project template: ${projectTemplateFile}`)
     } else {
@@ -45,7 +75,28 @@ export async function createProject(projectName: string, projectIcon: string) {
             projectParentNotebookId= await createProjectsRoot()
             await setSettingValue(Config.SETTINGS.PROJECTS_PRIVATE_PARENT_NOTEBOOK_FILE, projectParentNotebookId)
         }
-        await createProjectNotebooksAndNotes(projectStructure, projectParentNotebookId);
+        
+        // Create the top-level project folder first to get its ID
+        const projectRootId = (await createNotebook(projectStructure.name, projectParentNotebookId)).id;
+        
+        // We need to iterate children of the structure now, passing the new root ID
+        let tasksFolderId: string | null = null;
+        
+        for (const element of projectStructure.children) {
+             if ("content" in element) {
+                await createNote(element.name, element.content.join("\n"), element.is_todo, projectRootId);
+             } else {
+                const childId = await createProjectNotebooksAndNotes(element, projectRootId);
+                if (childId) tasksFolderId = childId;
+             }
+        }
+
+        if (tasksFolderId) {
+            await saveProjectMeta(projectRootId, tasksFolderId);
+        } else {
+             // If no tasks folder found in template (unlikely), fallback to root
+             await saveProjectMeta(projectRootId, projectRootId);
+        }
     }
 }
 

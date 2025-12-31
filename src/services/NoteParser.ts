@@ -28,15 +28,25 @@ export class NoteParser {
      * Toggles the completion status of a specific subtask within the markdown body.
      */
     public updateSubTaskStatus(body: string, subTaskTitle: string, checked: boolean): string {
+        const lines = body.split('\n');
         const escapedTitle = subTaskTitle.replace(/[.*+?^${}()|[\\]/g, '\\$&');
-        const regex = new RegExp(`^(\s*-\s*\[)([ xX])(\]\s*${escapedTitle}\s*)$`, 'm');
-        
-        const match = body.match(regex);
-        if (match) {
-            const newMark = checked ? 'x' : ' ';
-            return body.replace(regex, `$1${newMark}$3`);
+        const regex = new RegExp(`^(\\s*-\\s*\\[)([ xX])(\\]\\s*${escapedTitle})`);
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const match = line.match(regex);
+            
+            if (match) {
+                // Ensure we are not matching a prefix of another task
+                const restOfLine = line.substring(match[0].length);
+                if (restOfLine.trim().length === 0 || match[3].trim() === `] ${subTaskTitle}`) {
+                    const newMark = checked ? 'x' : ' ';
+                    lines[i] = line.replace(regex, `$1${newMark}$3`);
+                    return lines.join('\n'); // Return after finding and replacing the first match
+                }
+            }
         }
-        return body;
+        return body; // Return original body if no match found
     }
 
     /**

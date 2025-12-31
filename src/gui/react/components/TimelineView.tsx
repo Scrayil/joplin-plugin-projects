@@ -7,6 +7,9 @@ interface TimelineViewProps {
     onEditTask: (task: Task) => void;
 }
 
+/**
+ * Renders a Gantt-like timeline view of tasks based on their creation and due dates.
+ */
 const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTask }) => {
     const getPriorityValue = (tags: string[]) => {
         if (tags.some(t => t.toLowerCase().includes('high'))) return 1;

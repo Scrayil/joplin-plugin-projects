@@ -1,4 +1,6 @@
-// Mappa COMPLETA delle parole chiave per la ricerca
+/**
+ * Comprehensive map of emojis to their keywords for search functionality.
+ */
 const EMOJI_MAP = {
     // --- Productivity / Recent ---
     "📁": "folder directory file project",
@@ -375,6 +377,10 @@ const EMOJI_MAP = {
     "🏴󠁧󠁢󠁷󠁬󠁳󠁿": "wales"
 };
 
+/**
+ * Scrolls the emoji picker to the specified category.
+ * @param {number} index The index of the category to scroll to.
+ */
 window.scrollToCategory = function(index) {
     const headers = document.querySelectorAll('.emoji-picker__category-name');
     if (headers[index]) {
@@ -382,10 +388,14 @@ window.scrollToCategory = function(index) {
     }
 };
 
+/**
+ * Initializes the emoji picker functionality within the dialog.
+ * Handles search, selection, and display of emojis.
+ */
 const initPlugin = () => {
     const dialogRoot = document.querySelector('.dialog-root');
     const triggerBtn = document.getElementById('btn-emoji-trigger');
-    const fileBtn = document.getElementById('btn-file-trigger');
+    const fileBtn = document.getElementById('btn-file-trigger'); // This seems unused, leaving for now.
     const wrapper = document.getElementById('emoji-picker-wrapper');
     const displaySpan = document.getElementById('current-icon-display');
     const searchInput = document.getElementById('emoji-search-input');
@@ -393,13 +403,17 @@ const initPlugin = () => {
     const previewName = document.getElementById('preview-name');
     const hiddenInput = document.getElementById('selectedIcon');
 
-    // 1. POPOLAZIONE TITOLI PER RICERCA (Hydration)
+    // 1. Populate search titles for emojis
     emojiBtns.forEach(btn => {
         const emoji = btn.getAttribute('data-emoji') || btn.textContent.trim();
         const keywords = EMOJI_MAP[emoji] || emoji;
         btn.setAttribute('title', keywords);
     });
 
+    /**
+     * Toggles the visibility of the emoji picker.
+     * @param {boolean} show True to show the picker, false to hide.
+     */
     const togglePicker = (show) => {
         if (!wrapper || !dialogRoot) return;
 
@@ -419,37 +433,41 @@ const initPlugin = () => {
         }
     };
 
+    /**
+     * Filters emojis based on a search term and updates category visibility.
+     * @param {string} term The search term.
+     */
     const triggerSearch = (term) => {
         const lowerTerm = term.toLowerCase();
 
-        // 1. Filtra le singole emoji (mostra/nascondi bottoni)
+        // 1. Filter individual emojis (show/hide buttons)
         emojiBtns.forEach(btn => {
             const keywords = (btn.getAttribute('title') || '').toLowerCase();
             const emoji = (btn.getAttribute('data-emoji') || '').toLowerCase();
 
             if (keywords.includes(lowerTerm) || emoji.includes(lowerTerm)) {
-                btn.style.display = 'flex'; // O 'inline-block' a seconda del tuo CSS
+                btn.style.display = 'flex'; // Or 'inline-block' depending on your CSS
             } else {
                 btn.style.display = 'none';
             }
         });
 
-        // 2. Gestione Intelligente Sezioni (Nascondi titoli vuoti)
+        // 2. Manage section visibility (hide empty categories)
         const containers = document.querySelectorAll('.emoji-picker__container');
 
         containers.forEach(container => {
-            // Controlla se dentro questo container c'è almeno un bottone visibile
+            // Check if there is at least one visible emoji button within this container
             const hasVisibleEmojis = Array.from(container.children).some(child => child.style.display !== 'none');
 
-            // Seleziona il titolo (H2) che si trova subito prima del container
+            // Select the header (H2) immediately preceding the container
             const header = container.previousElementSibling;
 
             if (hasVisibleEmojis) {
-                // Ci sono risultati: mostra griglia e titolo
+                // Results found: show grid and title
                 container.style.display = 'grid';
                 if (header) header.style.display = 'block';
             } else {
-                // Nessun risultato: nascondi tutto per pulizia
+                // No results: hide everything for a cleaner UI
                 container.style.display = 'none';
                 if (header) header.style.display = 'none';
             }
@@ -465,9 +483,11 @@ const initPlugin = () => {
     }
 
     if (fileBtn) {
+        // This button's functionality is not fully implemented or clear.
+        // It's commented out in the original HTML, but leaving the JS listener in case it's intended for future use.
         fileBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            console.log("Richiesta apertura file...");
+            console.log("File open request...");
         });
     }
 
@@ -481,9 +501,9 @@ const initPlugin = () => {
 
     emojiBtns.forEach(btn => {
         btn.addEventListener('mouseenter', () => {
-            // Mostra una preview pulita
+            // Display a clean preview name for the emoji
             const fullTitle = btn.getAttribute('title') || '';
-            // Se c'è una descrizione lunga, prendi le prime 2-3 parole, altrimenti l'emoji
+            // Truncate long descriptions, otherwise use the emoji itself
             const shortName = fullTitle.length > 20 ? fullTitle.substring(0, 20) + "..." : fullTitle;
             previewName.textContent = shortName || btn.getAttribute('data-emoji');
         });

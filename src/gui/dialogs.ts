@@ -11,6 +11,10 @@ const logger = Logger.create('Projects: Index');
 // Session's state variables
 const HANDLES = {}
 
+/**
+ * Displays the dialog for creating a new project.
+ * Handles user input and invokes the project creation logic.
+ */
 export async function newProjectDialog() {
     let dialog: string
     if(!Object.keys(HANDLES).includes(Config.DIALOGS.CREATE_PROJECT)) {
@@ -46,6 +50,11 @@ export async function newProjectDialog() {
     }
 }
 
+/**
+ * Displays the dialog for creating a new task.
+ * Dynamically loads project options and handles task creation or redirection to project creation.
+ * @returns The form data object if confirmed, or null if canceled.
+ */
 export async function newTaskDialog() {
     let dialog: string;
     const pluginFolder = await getPluginFolder();
@@ -97,6 +106,12 @@ export async function newTaskDialog() {
     return null;
 }
 
+/**
+ * Displays the dialog for editing an existing task.
+ * Pre-fills the form with current task data (title, project, due date, urgency, subtasks).
+ * @param task The task object to be edited.
+ * @returns An object containing the action ('save' or 'delete') and updated data, or null if canceled.
+ */
 export async function editTaskDialog(task: any) {
     let dialog: string;
     const pluginFolder = await getPluginFolder();

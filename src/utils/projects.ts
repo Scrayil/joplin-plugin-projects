@@ -34,10 +34,16 @@ async function createProjectNotebooksAndNotes(projectStructure: NotebookObject, 
     return tasksFolderId;
 }
 
+/**
+ * Ensures the root "Projects" folder exists and returns its ID.
+ */
 async function createProjectsRoot() {
     return (await createNotebook("🗂️ Projects", "")).id
 }
 
+/**
+ * Persists the project metadata (mapping project root ID to tasks folder ID).
+ */
 async function saveProjectMeta(projectId: string, tasksFolderId: string) {
     try {
         const dataFolder = await getPluginDataFolder();
@@ -60,6 +66,11 @@ async function saveProjectMeta(projectId: string, tasksFolderId: string) {
     }
 }
 
+/**
+ * Creates a new project structure from a template.
+ * @param projectName The name of the project.
+ * @param projectIcon The icon/emoji for the project.
+ */
 export async function createProject(projectName: string, projectIcon: string) {
     const defaultTemplateFile = path.join(await getPluginFolder(), "gui", "assets", "project_template.json")
     const projectTemplate = await readFileContent(defaultTemplateFile)
@@ -97,6 +108,10 @@ export async function createProject(projectName: string, projectIcon: string) {
     }
 }
 
+/**
+ * Retrieves all project folders that are direct children of the "Projects" root.
+ * @returns Array of project objects {id, name}.
+ */
 export async function getAllProjects() {
     const rootId = await PersistenceService.getInstance().getValue('projects_root_id');
     if (!rootId) return [];

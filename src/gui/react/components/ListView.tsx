@@ -7,6 +7,9 @@ interface ListViewProps {
     onEditTask: (task: Task) => void;
 }
 
+/**
+ * Renders a sortable table view of active tasks.
+ */
 const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) => {
     const getPriorityValue = (tags: string[]) => {
         if (tags.some(t => t.toLowerCase().includes('high'))) return 1;

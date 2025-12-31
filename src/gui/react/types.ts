@@ -1,8 +1,14 @@
+/**
+ * Represents a subtask within a task note.
+ */
 export interface SubTask {
     title: string;
     completed: boolean;
 }
 
+/**
+ * Represents the core task data structure used in the dashboard.
+ */
 export interface Task {
     id: string;
     title: string;
@@ -15,11 +21,17 @@ export interface Task {
     subTasks: SubTask[];
 }
 
+/**
+ * Represents a project (Joplin notebook).
+ */
 export interface Project {
     id: string;
     name: string;
 }
 
+/**
+ * The full data payload received from the plugin backend.
+ */
 export interface DashboardData {
     projects: Project[];
     tasks: Task[];

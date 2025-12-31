@@ -101,6 +101,9 @@ export class TagService {
         return noteTagsMap;
     }
 
+    /**
+     * Helper to fetch tags for a single note.
+     */
     private async fetchTagsForNote(noteId: string): Promise<{ id: string, tags: string[] }> {
         const tags = await this.fetchAllItems(['notes', noteId, 'tags'], { fields: ['title'] });
         return {
@@ -143,6 +146,9 @@ export class TagService {
         }
     }
 
+    /**
+     * Generic helper to fetch all items with pagination.
+     */
     private async fetchAllItems(path: string[], query: any = null) {
         let page = 1;
         let items: any[] = [];

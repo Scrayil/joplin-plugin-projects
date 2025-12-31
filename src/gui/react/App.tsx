@@ -6,6 +6,10 @@ import TimelineView from './components/TimelineView';
 import ListView from './components/ListView';
 import InfoView from './components/InfoView';
 
+/**
+ * Main application component for the Task Dashboard.
+ * Manages state, data fetching, and tab switching.
+ */
 const App: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'kanban' | 'timeline' | 'table' | 'info'>('kanban');
     const [data, setData] = useState<DashboardData>({ projects: [], tasks: [] });
@@ -13,6 +17,9 @@ const App: React.FC = () => {
     const [projectFilter, setProjectFilter] = useState<string>('all');
     const isFetching = React.useRef(false);
 
+    /**
+     * Fetches fresh dashboard data from the plugin backend.
+     */
     const fetchData = React.useCallback(async () => {
         if (isFetching.current) return;
         isFetching.current = true;
@@ -28,6 +35,9 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        /**
+         * Detects Joplin's theme color and applies light/dark mode accordingly.
+         */
         const updateTheme = () => {
             const textColor = getComputedStyle(document.body).getPropertyValue('--joplin-color').trim();
             let isDark = false;

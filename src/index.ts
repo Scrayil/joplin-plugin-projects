@@ -10,6 +10,10 @@ Logger.initializeGlobalLogger(globalLogger);
 const logger = Logger.create('Projects: Index');
 
 joplin.plugins.register({
+	/**
+	 * Plugin entry point.
+	 * Initializes the Task Dashboard and registers commands.
+	 */
 	onStart: async function() {
 
 		// Initialize the Dashboard View

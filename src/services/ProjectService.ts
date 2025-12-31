@@ -168,6 +168,13 @@ export class ProjectService {
         return data;
     }
 
+    /**
+     * Generic helper to fetch all items from the Joplin Data API, handling pagination automatically.
+     * 
+     * @param path The API path segments (e.g., ['folders'] or ['folders', id, 'notes']).
+     * @param query Optional query parameters.
+     * @returns A promise resolving to an array of all items found.
+     */
     private async fetchAllItems(path: string[], query: any = null) {
         let page = 1;
         let items: any[] = [];
@@ -186,6 +193,12 @@ export class ProjectService {
         return items;
     }
 
+    /**
+     * Helper to fetch all folders from the API.
+     * 
+     * @param fields The fields to retrieve for each folder. Defaults to id, parent_id, and title.
+     * @returns A promise resolving to an array of folder objects.
+     */
     private async fetchAllFolders(fields: string[] = ['id', 'parent_id', 'title']) {
         return await this.fetchAllItems(['folders'], { fields: fields });
     }

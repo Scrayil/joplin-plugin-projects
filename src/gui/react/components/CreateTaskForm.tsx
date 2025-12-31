@@ -7,6 +7,10 @@ interface CreateTaskFormProps {
     onCreateTask: (title: string, projectId: string, subTasks: string[], urgency: string, dueDate: number | undefined) => void;
 }
 
+/**
+ * A form component for creating new tasks.
+ * Allows setting title, project, due date, urgency, and subtasks.
+ */
 const CreateTaskForm: React.FC<CreateTaskFormProps> = ({ projects, onCreateTask }) => {
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [selectedProject, setSelectedProject] = useState(projects.length > 0 ? projects[0].id : '');

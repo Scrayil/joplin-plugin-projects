@@ -4,9 +4,10 @@ import {newProjectDialog} from "../gui/dialogs";
 import {Config} from "./constants";
 import {TaskDashboard} from "../gui/TaskDashboard";
 
+/**
+ * Registers all plugin commands, toolbar buttons, and context menu items.
+ */
 export const registerJoplinCommands = async () => {
-    // Registers a command that creates the TOT note.
-    // This is triggered by the below button's click
     await joplin.commands.register({
         name: Config.COMMANDS.NEW_PROJECT,
         label: 'Create a new project',
@@ -31,7 +32,7 @@ export const registerJoplinCommands = async () => {
         ToolbarButtonLocation.NoteToolbar
     );
 
-    // Adds also a context menu entry for the note editor, to generate the corresponding TOT
+    // Adds a menu entry to the tollbar's menu to crate a new project
     await joplin.views.menuItems.create(Config.MENUS.TOOLBAR_CONTEXT, Config.COMMANDS.NEW_PROJECT, MenuItemLocation.Tools, {accelerator: Config.MENUS.ACCELERATOR})
     // Adds a menu entry to the folders' context menu
     await joplin.views.menuItems.create(Config.MENUS.FOLDER_CONTEXT, Config.COMMANDS.NEW_PROJECT, MenuItemLocation.FolderContextMenu, {accelerator: Config.MENUS.ACCELERATOR})

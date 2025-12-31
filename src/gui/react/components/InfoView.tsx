@@ -1,5 +1,8 @@
 import * as React from 'react';
 
+/**
+ * Renders the information/help tab, providing a guide on how to use the dashboard.
+ */
 const InfoView: React.FC = () => {
     return (
         <div className="info-view-container" style={{ 

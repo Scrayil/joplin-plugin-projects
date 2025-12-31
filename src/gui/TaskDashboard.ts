@@ -183,6 +183,9 @@ export class TaskDashboard {
         }
     }
 
+    /**
+     * Creates a new task note in the appropriate folder and applies initial tags.
+     */
     private async createTask(payload: { title: string; projectId: string; subTasks?: string[]; urgency?: string; dueDate?: number }) {
         try {
             const tasksFolderId = await this.projectService.getTasksFolderForProject(payload.projectId);
@@ -210,6 +213,9 @@ export class TaskDashboard {
         }
     }
 
+    /**
+     * Updates an existing task's body (subtasks), due date, and urgency tags.
+     */
     private async updateTask(taskId: string, payload: { subTasks: string[]; urgency: string; dueDate: number }) {
         try {
             const body = this.noteParser.createBodyFromSubTasks(payload.subTasks);
@@ -227,6 +233,10 @@ export class TaskDashboard {
         }
     }
 
+    /**
+     * Updates the task's completion status and synchronizes subtask checkboxes.
+     * Also updates status tags (e.g., 'done', 'in_progress').
+     */
     private async updateTaskStatus(payload: { taskId: string, newStatus: string }) {
         const { taskId, newStatus } = payload;
         
@@ -248,6 +258,9 @@ export class TaskDashboard {
         return { success: true };
     }
 
+    /**
+     * Toggles a specific subtask checkbox within the note markdown body.
+     */
     private async toggleSubTask(payload: { taskId: string, subTaskTitle: string, checked: boolean }) {
         const note = await joplin.data.get(['notes', payload.taskId], { fields: ['body'] });
         const newBody = this.noteParser.updateSubTaskStatus(note.body, payload.subTaskTitle, payload.checked);

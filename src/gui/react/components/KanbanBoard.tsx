@@ -11,8 +11,16 @@ interface KanbanBoardProps {
     onEditTask: (task: Task) => void;
 }
 
+/**
+ * Renders tasks in a Kanban-style board with draggable cards.
+ * Columns: To Do, In Progress, Done.
+ */
 const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStatus, onToggleSubTask, onOpenNote, onEditTask }) => {
     
+    /**
+     * Filters and sorts tasks for a specific column (status).
+     * Sorts by Due Date -> Priority -> Creation Time.
+     */
     const getTasksByStatus = (status: string) => {
         let filteredTasks = [];
         if (status === 'todo') filteredTasks = tasks.filter(t => t.status === 'todo' || t.status === 'overdue');

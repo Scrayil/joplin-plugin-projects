@@ -1,5 +1,7 @@
 (function() {
-    // 1. Theme Detection
+    /**
+     * Detects Joplin's theme (light/dark) and applies it to the dialog.
+     */
     function updateTheme() {
         const textColor = getComputedStyle(document.body).getPropertyValue('--joplin-color').trim();
         let isDark = false;
@@ -23,18 +25,23 @@
     const dateInput = document.getElementById('taskDueDate');
     const btnAddNewProject = document.getElementById('btnAddNewProject');
 
-    // Prevent past dates
+    /**
+     * Sets the minimum allowed date for the due date input to prevent past dates.
+     */
     function updateMinDate() {
         if (dateInput) {
             const now = new Date();
-            // Format to YYYY-MM-DDTHH:mm for datetime-local
+            // Format to YYYY-MM-DDTHH:mm for datetime-local input type
             const isoStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
             dateInput.min = isoStr;
         }
     }
     updateMinDate();
 
-    // Initialize subTasks from hidden input (CRITICAL for Edit mode)
+    /**
+     * Initializes the subTasks array from the value of a hidden input,
+     * which is crucial for populating subtasks when editing an existing task.
+     */
     if (hiddenInput && hiddenInput.value) {
         const initialTasks = hiddenInput.value.split('\n');
         initialTasks.forEach(t => {
@@ -42,7 +49,11 @@
         });
     }
 
-    // Function to find and handle the hidden footer button
+    /**
+     * Finds the internal "Add Project" button in the dialog footer by its text content.
+     * This button is used to trigger the new project dialog from within the new task dialog.
+     * @returns {HTMLButtonElement|null} The found button element or null.
+     */
     function getInternalAddProjectBtn() {
         const buttons = window.parent.document.querySelectorAll('button');
         for (const btn of buttons) {
@@ -76,9 +87,13 @@
         });
     }
 
+    /**
+     * Updates the displayed list of subtasks in the UI and synchronizes with the hidden input field.
+     * Ensures a minimum number of list rows are rendered even if empty.
+     */
     function updateList() {
         list.innerHTML = '';
-        const rowsToRender = Math.max(5, subTasks.length);
+        const rowsToRender = Math.max(5, subTasks.length); // Ensure at least 5 rows are always shown
         for (let i = 0; i < rowsToRender; i++) {
             const task = subTasks[i];
             const isEmpty = i >= subTasks.length;
@@ -120,5 +135,6 @@
         }
     });
 
+    // Initial render of the subtask list when the dialog opens
     updateList();
 })();

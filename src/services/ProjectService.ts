@@ -6,6 +6,7 @@ import { NoteParser } from './NoteParser';
 import * as path from 'path';
 import * as fs from 'fs';
 import { PersistenceService } from './PersistenceService';
+import { getOrInitProjectRootId } from '../utils/projects';
 
 /**
  * Service responsible for aggregating project data, scanning folders, and maintaining the dashboard state.
@@ -56,7 +57,9 @@ export class ProjectService {
     public async getDashboardData() {
         await this.loadProjectMeta();
 
-        const rootId = await PersistenceService.getInstance().getValue('projects_root_id');
+        // Use the smart resolver. Pass 'false' to avoid auto-creating the folder structure
+        // just by opening the dashboard. It will only return an ID if it exists locally or via Anchor note.
+        const rootId = await getOrInitProjectRootId(false);
         
         if (!rootId) {
             return { projects: [], tasks: [] };

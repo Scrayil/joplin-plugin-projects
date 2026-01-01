@@ -107,9 +107,9 @@ async function findProjectRootViaAnchor(): Promise<string | null> {
  * The core logic to resolve the "Projects" root folder.
  * 1. Checks local persistence AND if folder is not in trash.
  * 2. If missing/trashed, checks for global Anchor Note (Sync recovery).
- * 3. If missing, creates new Root + Anchor (Clean slate).
+ * 3. If missing, creates new Root + Anchor (Clean slate) ONLY if autoCreate is true.
  */
-async function getOrInitProjectRootId(): Promise<string> {
+export async function getOrInitProjectRootId(autoCreate: boolean = true): Promise<string | null> {
     const persistence = PersistenceService.getInstance();
     let rootId = await persistence.getValue('projects_root_id');
     
@@ -145,7 +145,12 @@ async function getOrInitProjectRootId(): Promise<string> {
         return discoveredId;
     }
 
-    // SCENARIO 3: Nothing found. Fresh Start.
+    // SCENARIO 3: Nothing found. 
+    if (!autoCreate) {
+        return null;
+    }
+
+    // Fresh Start.
     logger.info("No Active Project Root found. Creating new structure.");
     const newRoot = await createNotebook("🗂️ Projects", "");
     const newId = newRoot.id;

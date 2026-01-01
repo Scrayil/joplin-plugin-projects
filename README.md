@@ -4,7 +4,7 @@
 
 An advanced project management plugin for Joplin that transforms your notes into a powerful, visual, and interactive task dashboard. Organize, track, and manage your projects with Kanban, Timeline, and List views, all seamlessly integrated within the Joplin environment.
 
-![Plugin Screenshot](https://raw.githubusercontent.com/joplin/plugin-projects/main/assets/promo.png)
+![Plugin Screenshot](https://github.com/Scrayil/joplin-plugin-projects/blob/main/assets/promo.png)
 
 ## ✨ Features
 

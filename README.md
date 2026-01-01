@@ -72,6 +72,10 @@ The dashboard is the heart of the plugin and provides several ways to look at yo
   3.  Creation Date (oldest first).
 - **Interactions**: Single-click to open the note, double-click to edit.
 
+## My official plugins
+
+[![Joplin Plugins](https://img.shields.io/badge/Joplin_Plugins-purple.svg)](https://joplinapp.org/plugins/?search=author%3D%22Mattia%20Bennati%20(Scrayil)%22%20max-results%3D20)
+
 ## 📄 License
 
 Copyright 2026 Mattia Bennati  

@@ -15,6 +15,9 @@ const logger = Logger.create('Projects: Projects');
 type NoteObject = {name: string; content: Array<NoteObject>, is_todo: boolean};
 type NotebookObject = {name:string, children:Array<NotebookObject|NoteObject>};
 
+// Cache to prevent repetitive API scanning for the anchor note during polling
+let anchorValidatedForId: string | null = null;
+
 async function createProjectNotebooksAndNotes(projectStructure: NotebookObject, parent_id: string): Promise<string | null> {
     const currentNotebookId = (await createNotebook(projectStructure.name, parent_id)).id
     let tasksFolderId: string | null = null;
@@ -39,6 +42,10 @@ async function createProjectNotebooksAndNotes(projectStructure: NotebookObject, 
  * If not found, creates it to ensure future synchronization.
  */
 async function ensureAnchorNote(folderId: string) {
+    if (anchorValidatedForId === folderId) {
+        return;
+    }
+
     try {
         let page = 1;
         let found = false;
@@ -62,6 +69,9 @@ async function ensureAnchorNote(folderId: string) {
             logger.info("Anchor note not found in root folder. Creating migration anchor.");
             await createNote(Config.ANCHOR.TITLE, Config.ANCHOR.BODY, false, folderId);
         }
+        
+        // Cache the validation success
+        anchorValidatedForId = folderId;
     } catch (error) {
         logger.error("Error ensuring anchor note:", error);
     }

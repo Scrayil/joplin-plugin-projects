@@ -15,6 +15,7 @@ export interface Task {
     status: 'todo' | 'in_progress' | 'done' | 'overdue';
     dueDate?: number;
     createdTime: number;
+    completedTime?: number;
     projectId: string;
     projectName: string;
     tags: string[];

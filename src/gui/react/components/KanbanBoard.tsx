@@ -110,16 +110,27 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStat
 
     const renderColumn = (status: string, title: string) => {
         const columnTasks = getTasksByStatus(status);
+        let displayedTasks = columnTasks;
+        let hiddenCount = 0;
+
+        if (status === 'done') {
+            const oneMonthAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+            displayedTasks = columnTasks.filter(t => !t.completedTime || t.completedTime >= oneMonthAgo);
+            hiddenCount = columnTasks.length - displayedTasks.length;
+        }
+
         return (
             <Droppable droppableId={status}>
                 {(provided) => (
                     <div className="column" ref={provided.innerRef} {...provided.droppableProps}>
                         <div className="column-header">
                             <h3>{title}</h3>
-                            <span className="count-badge">{columnTasks.length}</span>
+                            <span className="count-badge" title={hiddenCount > 0 ? `${hiddenCount} old tasks hidden` : ''}>
+                                {hiddenCount > 0 ? `${displayedTasks.length} / ${columnTasks.length}` : displayedTasks.length}
+                            </span>
                         </div>
                         <div className="task-list">
-                            {columnTasks.map((task, index) => {
+                            {displayedTasks.map((task, index) => {
                                 const isOverdue = task.dueDate > 0 && task.dueDate < Date.now() && task.status !== 'done';
                                 return (
                                     <Draggable key={task.id} draggableId={task.id} index={index}>

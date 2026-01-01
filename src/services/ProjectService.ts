@@ -147,6 +147,7 @@ export class ProjectService {
                 status: status,
                 dueDate: n.todo_due,
                 createdTime: n.created_time,
+                completedTime: n.todo_completed,
                 projectId: project?.id,
                 projectName: project?.name,
                 tags: tags,

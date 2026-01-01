@@ -48,6 +48,7 @@ const InfoView: React.FC = () => {
                     <li style={{ marginBottom: '12px' }}><strong>Priority:</strong> High 🔴 &gt; Normal 🟠 &gt; Low 🔵.</li>
                     <li style={{ marginBottom: '12px' }}><strong>Creation Date:</strong> Oldest tasks first (for same deadline/priority).</li>
                 </ol>
+                <p style={{ marginTop: '15px' }}><strong>Note on "Done" column:</strong> To keep the board clean, tasks completed more than <strong>30 days ago</strong> are automatically hidden from the "Done" column. The counter in the column header shows "Visible / Total" tasks.</p>
             </section>
 
             <section style={{ marginBottom: '30px' }}>

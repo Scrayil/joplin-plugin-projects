@@ -29,7 +29,9 @@ export function readFileContent(filePath: string) {
     try {
         return fs.readFileSync(filePath, 'utf8');
     } catch (err) {
-        logger.error(err);
+        if (err.code !== 'ENOENT') {
+            logger.error(err);
+        }
         return "";
     }
 }

@@ -38,5 +38,10 @@ export const Config = {
 
     FOLDERS: {
         TASKS: 'Tasks'
+    },
+
+    ANCHOR: {
+        TITLE: '⚙️ Projects Root Marker',
+        BODY: 'DO NOT DELETE.\n\nThis note is used by the Projects plugin to identify the root folder across different devices.\nDeleting this note may cause the plugin to create duplicate project folders on other devices.',
     }
 } as const;

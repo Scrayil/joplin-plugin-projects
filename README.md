@@ -1,6 +1,6 @@
 # Joplin Projects Plugin
 
-[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![GPL V2 License](https://img.shields.io/badge/License-GPL_V2-blue.svg)](LICENSE)
 
 An advanced project management plugin for Joplin that transforms your notes into a powerful, visual, and interactive task dashboard. Organize, track, and manage your projects with Kanban, Timeline, and List views, all seamlessly integrated within the Joplin environment.
 

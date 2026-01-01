@@ -1,12 +1,17 @@
 {
   "name": "joplin-plugin-projects",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "scripts": {
     "dist": "webpack --env joplin-plugin-config=buildMain && webpack --env joplin-plugin-config=buildExtraScripts && webpack --env joplin-plugin-config=createArchive",
     "prepare": "npm run dist",
     "updateVersion": "webpack --env joplin-plugin-config=updateVersion",
     "update": "npm install -g generator-joplin && yo joplin --node-package-manager npm --update --force"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Scrayil/joplin-plugin-projects"
+  },
+  "homepage": "https://github.com/Scrayil",
   "license": "GPL-2.0",
   "keywords": [
     "joplin-plugin",

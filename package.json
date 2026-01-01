@@ -7,7 +7,7 @@
     "updateVersion": "webpack --env joplin-plugin-config=updateVersion",
     "update": "npm install -g generator-joplin && yo joplin --node-package-manager npm --update --force"
   },
-  "license": "MIT",
+  "license": "GPL-2.0",
   "keywords": [
     "joplin-plugin"
   ],

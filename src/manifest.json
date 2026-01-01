@@ -8,9 +8,22 @@
 	"author": "Mattia Bennati (Scrayil)",
 	"homepage_url": "https://github.com/Scrayil",
 	"repository_url": "https://github.com/Scrayil/joplin-plugin-projects",
-	"keywords": [],
-	"categories": [],
-	"screenshots": [],
-	"icons": {},
-	"promo_tile": {}
+	"keywords": ["joplin-plugin", "note-taking", "productivity", "project", "shortcuts", "todo", "checklist", "task", "timeline", "kanban", "board", "list", "due"],
+	"categories": ["productivity", "viewer", "personal knowledge management"],
+	"screenshots": [
+		{ "src": "assets/screenshots/kanban_view.png", "label": "Kanban view to manage all tasks' states" },
+		{ "src": "assets/screenshots/timeline_view.png", "label": "Timeline view showing all active tasks having a due datetime" },
+		{ "src": "assets/screenshots/list_view.png", "label": "List view to easily visualize pending tasks with their data" },
+		{ "src": "assets/screenshots/edit_task_dialog.png", "label": "Dialog used to edit or delete a specific task" }
+	],
+	"icons": {
+		"16": "assets/logo/16x16.png",
+		"32": "assets/logo/32x32.png",
+		"48": "assets/logo/48x48.png",
+		"128": "assets/logo/128x128.png",
+		"256": "assets/logo/256x256.png",
+		"512": "assets/logo/512x512.png",
+		"1024": "assets/logo/1024x1024.png"
+	},
+	"promo_tile": {"src": "assets/promo.png", "label": "The plugin's promo tile image"}
 }

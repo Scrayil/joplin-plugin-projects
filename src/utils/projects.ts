@@ -231,7 +231,7 @@ export async function createProject(projectName: string, projectIcon: string) {
  */
 export async function getAllProjects() {
     // Use the new robust resolver 
-    const rootId = await getOrInitProjectRootId();
+    const rootId = await getOrInitProjectRootId(false);
     
     if (!rootId) return [];
 

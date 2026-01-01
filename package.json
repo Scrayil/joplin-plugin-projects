@@ -9,7 +9,19 @@
   },
   "license": "GPL-2.0",
   "keywords": [
-    "joplin-plugin"
+    "joplin-plugin",
+    "note-taking",
+    "productivity",
+    "project",
+    "shortcuts",
+    "todo",
+    "checklist",
+    "task",
+    "timeline",
+    "kanban",
+    "board",
+    "list",
+    "due"
   ],
   "files": [
     "publish"

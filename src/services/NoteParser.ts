@@ -30,20 +30,17 @@ export class NoteParser {
     public updateSubTaskStatus(body: string, subTaskTitle: string, checked: boolean): string {
         const lines = body.split('\n');
         const escapedTitle = subTaskTitle.replace(/[.*+?^${}()|[\\]/g, '\\$&');
-        const regex = new RegExp(`^(\\s*-\\s*\\[)([ xX])(\\]\\s*${escapedTitle})`);
+        // Added $ anchor to ensure we match the exact task title and not a prefix
+        const regex = new RegExp(`^(\\s*-\\s*\\[)([ xX])(\\]\\s*${escapedTitle})$`);
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const match = line.match(regex);
             
             if (match) {
-                // Ensure we are not matching a prefix of another task
-                const restOfLine = line.substring(match[0].length);
-                if (restOfLine.trim().length === 0 || match[3].trim() === `] ${subTaskTitle}`) {
-                    const newMark = checked ? 'x' : ' ';
-                    lines[i] = line.replace(regex, `$1${newMark}$3`);
-                    return lines.join('\n'); // Return after finding and replacing the first match
-                }
+                const newMark = checked ? 'x' : ' ';
+                lines[i] = line.replace(regex, `$1${newMark}$3`);
+                return lines.join('\n');
             }
         }
         return body; // Return original body if no match found
@@ -58,6 +55,103 @@ export class NoteParser {
         } else {
             return body.replace(/- \[[xX]\]/g, '- [ ]');
         }
+    }
+
+    /**
+     * Replaces existing subtasks in the note body with a new list of subtasks,
+     * attempting to preserve the original layout (newlines, context) as much as possible.
+     */
+    public updateNoteBodyWithSubTasks(currentBody: string, newSubTasks: string[]): string {
+        const lines = currentBody.split('\n');
+        const checkboxRegex = /^\s*-\s*\[([ xX])\]\s*(.*)$/;
+        
+        const existingTasks: { lineIndex: number; title: string; originalLine: string }[] = [];
+        for (let i = 0; i < lines.length; i++) {
+            const match = lines[i].match(checkboxRegex);
+            if (match) {
+                existingTasks.push({
+                    lineIndex: i,
+                    title: match[2].trim(),
+                    originalLine: lines[i]
+                });
+            }
+        }
+
+        if (existingTasks.length === 0) {
+            const newLines = newSubTasks.map(st => `- [ ] ${st}`);
+            if (currentBody.trim().length > 0) {
+                return currentBody + '\n\n' + newLines.join('\n');
+            } else {
+                return newLines.join('\n');
+            }
+        }
+
+        const keptExistingIndices = new Set<number>();
+        const insertions = new Map<number, string[]>();
+        
+        let lastMatchedExistingIndex = -1;
+        let currentExistingSearchIdx = 0;
+
+        const initialInsertions: string[] = [];
+        let collectingInitial = true;
+
+        for (const newTaskTitle of newSubTasks) {
+            let found = false;
+            
+            for (let i = currentExistingSearchIdx; i < existingTasks.length; i++) {
+                if (existingTasks[i].title === newTaskTitle) {
+                    keptExistingIndices.add(existingTasks[i].lineIndex);
+                    lastMatchedExistingIndex = existingTasks[i].lineIndex;
+                    currentExistingSearchIdx = i + 1;
+                    found = true;
+                    collectingInitial = false;
+                    break;
+                }
+            }
+
+            if (!found) {
+                if (collectingInitial) {
+                    initialInsertions.push(newTaskTitle);
+                } else {
+                    if (!insertions.has(lastMatchedExistingIndex)) {
+                        insertions.set(lastMatchedExistingIndex, []);
+                    }
+                    insertions.get(lastMatchedExistingIndex)!.push(newTaskTitle);
+                }
+            }
+        }
+
+        const resultLines: string[] = [];
+        const existingLineIndices = new Set(existingTasks.map(t => t.lineIndex));
+        let initialInsertionsFlushed = false;
+        
+        for (let i = 0; i < lines.length; i++) {
+            const isCheckbox = existingLineIndices.has(i);
+
+            if (!isCheckbox) {
+                resultLines.push(lines[i]);
+            } else {
+                if (keptExistingIndices.has(i)) {
+                    if (!initialInsertionsFlushed && initialInsertions.length > 0) {
+                         initialInsertions.forEach(t => resultLines.push(`- [ ] ${t}`));
+                         initialInsertionsFlushed = true;
+                    }
+
+                    resultLines.push(lines[i]);
+
+                    if (insertions.has(i)) {
+                        insertions.get(i)!.forEach(t => resultLines.push(`- [ ] ${t}`));
+                    }
+                } else {
+                    if (!initialInsertionsFlushed && initialInsertions.length > 0) {
+                         initialInsertions.forEach(t => resultLines.push(`- [ ] ${t}`));
+                         initialInsertionsFlushed = true;
+                    }
+                }
+            }
+        }
+
+        return resultLines.join('\n');
     }
 
     /**

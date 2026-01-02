@@ -218,7 +218,10 @@ export class TaskDashboard {
      */
     private async updateTask(taskId: string, payload: { subTasks: string[]; urgency: string; dueDate: number }) {
         try {
-            const body = this.noteParser.createBodyFromSubTasks(payload.subTasks);
+            // Fetch current note body to preserve non-checklist content
+            const currentNote = await joplin.data.get(['notes', taskId], { fields: ['body'] });
+            const body = this.noteParser.updateNoteBodyWithSubTasks(currentNote.body, payload.subTasks);
+            
             await joplin.data.put(['notes', taskId], null, { 
                 body: body,
                 todo_due: payload.dueDate

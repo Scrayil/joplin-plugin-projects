@@ -125,7 +125,9 @@ export class TaskDashboard {
                     const formData = result.data;
                     const urgency = formData.taskUrgency;
                     const dueDateStr = formData.taskDueDate;
-                    const dueDate = dueDateStr ? new Date(dueDateStr).getTime() : 0;
+                    let dueDate = dueDateStr ? new Date(dueDateStr).getTime() : 0;
+                    if (!Number.isFinite(dueDate)) dueDate = 0;
+
                     const subTasksStr = formData.taskSubTasks || "";
                     const subTasks = subTasksStr.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
 
@@ -172,7 +174,9 @@ export class TaskDashboard {
 
             const urgency = formData.taskUrgency;
             const dueDateStr = formData.taskDueDate; 
-            const dueDate = dueDateStr ? new Date(dueDateStr).getTime() : undefined;
+            let dueDate = dueDateStr ? new Date(dueDateStr).getTime() : undefined;
+            if (dueDate !== undefined && !Number.isFinite(dueDate)) dueDate = undefined;
+
             const subTasksStr = formData.taskSubTasks || "";
             const subTasks = subTasksStr.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
 

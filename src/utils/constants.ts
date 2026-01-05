@@ -9,11 +9,13 @@ export const Config = {
     },
 
     MENUS: {
-        ACCELERATOR: 'Ctrl+N',
-        TOOLBAR_CONTEXT: PREFIX + 'create_new_project_toolbar_menu',
-        FOLDER_CONTEXT: PREFIX + 'create_new_project_folders_menu',
-        NOTES_CONTEXT: PREFIX + 'create_new_project_notes_menu',
-        DASHBOARD_BUTTON: PREFIX + 'dashboard_button',
+        TOGGLE_DASHBOARD_ACCELERATOR: "Ctrl+Alt+P",
+        TOGGLE_DASHBOARD_BUTTON: PREFIX + 'toggle_dashboard_button',
+        TOGGLE_DASHBOARD_TOOLBAR_CONTEXT: PREFIX + 'toggle_dashboard_toolbar_menu',
+        NEW_PROJECT_ACCELERATOR: 'Ctrl+N',
+        NEW_PROJECT_TOOLBAR_CONTEXT: PREFIX + 'create_new_project_toolbar_menu',
+        NEW_PROJECT_FOLDER_CONTEXT: PREFIX + 'create_new_project_folders_menu',
+        NEW_PROJECT_NOTES_CONTEXT: PREFIX + 'create_new_project_notes_menu',
     },
 
     DIALOGS: {

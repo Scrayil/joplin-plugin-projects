@@ -137,7 +137,7 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
                                         overflow: 'hidden',
                                         textOverflow: 'ellipsis'
                                     }} title={task.projectName}>
-                                        <span style={{ color: 'orange', fontWeight: 'bold' }}>[{task.projectName}]</span>
+                                        <span style={{ color: 'orange', fontWeight: 'bold', fontSize: '1rem' }}>[{task.projectName}]</span>
                                     </td>
                                     <td style={{ 
                                         padding: '12px 10px', 

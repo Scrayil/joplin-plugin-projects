@@ -265,7 +265,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .task-project-tag {
     color: orange;
     font-weight: bold;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     margin-right: 6px;
 }
 

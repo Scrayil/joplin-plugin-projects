@@ -125,7 +125,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                                  onClick={() => onOpenNote(task.id)}
                                  onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
                                  title={`${task.title}\nDue: ${formatDate(task.dueDate!, true)}`}>
-                                <div style={{ position: 'absolute', left: `${startPos}%`, top: '5px', fontSize: '0.8rem', color: 'var(--joplin-color)', whiteSpace: 'nowrap', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <div style={{ position: 'absolute', left: `${startPos}%`, top: '5px', fontSize: '0.9rem', color: 'var(--joplin-color)', whiteSpace: 'nowrap', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: projectColor, display: 'inline-block', flexShrink: 0 }}></span>
                                     <span style={{ color: 'orange' }}>[{task.projectName}]</span> {task.title}
                                 </div>

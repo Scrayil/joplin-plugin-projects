@@ -17,11 +17,9 @@ body {
     border-radius: 8px;
     padding: 20px;
 
-    /* 1. Dimensioni di partenza (Compatte) */
     width: 450px;
-    min-height: 200px; /* Altezza minima base */
+    min-height: 200px;
 
-    /* 2. Setup Transizione Fluida */
     transition: width 0.3s cubic-bezier(0.4, 0.0, 0.2, 1),
     min-height 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
 
@@ -30,10 +28,9 @@ body {
     flex-direction: column;
 }
 
-/* 3. Stato Espanso (Attivato via JS) */
 .dialog-root.expanded {
-    width: 750px;      /* Si allarga */
-    min-height: 550px; /* Si alza */
+    width: 750px;
+    min-height: 550px;
 }
 
 h1 {
@@ -148,24 +145,20 @@ details.advanced-section summary:hover {
 
 /* --- EMOJI PICKER (Dimensione Standard "Inline") --- */
 .emoji-picker__wrapper {
-    /* Non più fixed/absolute. Fluisce nel documento sotto i bottoni */
     position: relative;
     margin-top: 15px;
 
-    /* Occupa tutto lo spazio orizzontale disponibile nel dialog espanso */
     width: 100%;
 
-    /* Altezza fissa standard */
     height: 380px;
 
     background: #25282C;
     border: 1px solid #555;
     border-radius: 6px;
-    display: flex; /* Flex è settato via JS, ma lo lasciamo qui per struttura */
+    display: flex;
     flex-direction: column;
     overflow: hidden;
 
-    /* Animazione di entrata */
     animation: fadeIn 0.3s ease-in-out;
 }
 

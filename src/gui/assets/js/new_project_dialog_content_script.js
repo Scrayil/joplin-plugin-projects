@@ -440,7 +440,7 @@ const initPlugin = () => {
     const triggerSearch = (term) => {
         const lowerTerm = term.toLowerCase();
 
-        // 1. Filter individual emojis (show/hide buttons)
+        // Filtering individual emojis (showing/hiding buttons)
         emojiBtns.forEach(btn => {
             const keywords = (btn.getAttribute('title') || '').toLowerCase();
             const emoji = (btn.getAttribute('data-emoji') || '').toLowerCase();
@@ -452,14 +452,14 @@ const initPlugin = () => {
             }
         });
 
-        // 2. Manage section visibility (hide empty categories)
+        // Managing section visibility (hiding empty categories)
         const containers = document.querySelectorAll('.emoji-picker__container');
 
         containers.forEach(container => {
-            // Check if there is at least one visible emoji button within this container
+            // Checking if there is at least one visible emoji button within this container
             const hasVisibleEmojis = Array.from(container.children).some(child => child.style.display !== 'none');
 
-            // Select the header (H2) immediately preceding the container
+            // Selecting the header (H2) immediately preceding the container
             const header = container.previousElementSibling;
 
             if (hasVisibleEmojis) {
@@ -490,7 +490,7 @@ const initPlugin = () => {
             const reader = new FileReader();
             reader.onload = (event) => {
                 try {
-                    // Basic validation that it looks like JSON
+                    // Basic validation to check for JSON validity
                     const json = JSON.parse(event.target.result);
                     templateContentArea.value = JSON.stringify(json); // Store minified JSON
                     fileStatus.textContent = `Loaded: ${file.name}`;
@@ -516,8 +516,6 @@ const initPlugin = () => {
     }
 
     if (fileBtn) {
-        // This button's functionality is not fully implemented or clear.
-        // It's commented out in the original HTML, but leaving the JS listener in case it's intended for future use.
         fileBtn.addEventListener('click', (e) => {
             e.preventDefault();
             console.log("File open request...");

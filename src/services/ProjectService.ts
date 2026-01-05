@@ -100,7 +100,7 @@ export class ProjectService {
 
         for (const folderId of foldersToScan) {
             const notes = await this.fetchAllItems(['folders', folderId, 'notes'], {
-                fields: ['id', 'updated_time', 'is_todo', 'parent_id']
+                fields: ['id', 'updated_time', 'is_todo', 'parent_id', 'title', 'todo_completed', 'todo_due', 'created_time']
             });
             const todos = notes.filter((n: any) => n.is_todo);
             validTodosMetadata = validTodosMetadata.concat(todos);
@@ -110,26 +110,39 @@ export class ProjectService {
             });
         }
 
-        const currentSignature = `${validTodosMetadata.length}-${maxUpdated}`;
+        // Fetch tags for ALL candidate notes to include in the signature.
+        // This ensures that if a tag is added/removed externally, the signature changes.
+        const noteIds = validTodosMetadata.map(n => n.id);
+        const tagsMap = await this.tagService.getTagsForNotes(noteIds);
+
+        // Create a signature based on Note Updates AND Tag content
+        let tagsSignature = '';
+        tagsMap.forEach((tags, id) => {
+            tagsSignature += `${id}:${tags.sort().join(',')}|`;
+        });
+
+        const currentSignature = `${validTodosMetadata.length}-${maxUpdated}-${tagsSignature}`;
         
         if (this.dashboardCache && currentSignature === this.lastSignature) {
             return this.dashboardCache;
         }
 
-        let fullNotes: any[] = [];
+        // Cache miss or data changed: We already have metadata and tags, just need bodies for parsing subtasks
+        // Optimization: Batch the body fetching to prevent freezing the UI with too many concurrent requests.
+        const notesWithBody: any[] = [];
+        const batchSize = 20;
         
-        for (const folderId of foldersToScan) {
-            const notes = await this.fetchAllItems(['folders', folderId, 'notes'], {
-                fields: ['id', 'parent_id', 'title', 'is_todo', 'todo_completed', 'todo_due', 'body', 'created_time', 'updated_time']
-            });
-            fullNotes = fullNotes.concat(notes.filter((n: any) => n.is_todo));
+        for (let i = 0; i < validTodosMetadata.length; i += batchSize) {
+            const batch = validTodosMetadata.slice(i, i + batchSize);
+            const batchResults = await Promise.all(batch.map(async (n) => {
+                 const noteWithBody = await joplin.data.get(['notes', n.id], { fields: ['body'] });
+                 return { ...n, body: noteWithBody.body };
+            }));
+            notesWithBody.push(...batchResults);
         }
 
-        const noteIds = fullNotes.map(n => n.id);
-        const tagsMap = await this.tagService.getTagsForNotes(noteIds);
-
         const dashboardTasks: any[] = [];
-        for (const n of fullNotes) {
+        for (const n of notesWithBody) {
             const project = folderToProjectMap.get(n.parent_id);
             const tags = tagsMap.get(n.id) || [];
             const subTasks = this.noteParser.parseSubTasks(n.body);

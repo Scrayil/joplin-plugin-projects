@@ -8,6 +8,11 @@ export const Config = {
         TOGGLE_DASHBOARD: PREFIX + 'toggle_dashboard',
     },
 
+    SETTINGS: {
+        PROJECT_SECTION: PREFIX + 'settings_section',
+        PROJECT_WIKI_TEMPLATE: PREFIX + 'new_project_wiki_template_setting',
+    },
+
     MENUS: {
         TOGGLE_DASHBOARD_ACCELERATOR: "Ctrl+Alt+P",
         TOGGLE_DASHBOARD_BUTTON: PREFIX + 'toggle_dashboard_button',

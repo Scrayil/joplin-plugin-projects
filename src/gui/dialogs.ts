@@ -42,8 +42,11 @@ export async function newProjectDialog() {
             await joplin.views.dialogs.showToast({message: "Project name required", duration: 3000, type: ToastType.Error})
         } else {
             logger.info(`Creating project: ${projectIcon} ${projectName}`);
-            await createProject(projectName, projectIcon)
-            await joplin.views.dialogs.showToast({message: "Project created successfully", duration: 3000, type: ToastType.Success})
+            if(await createProject(projectName, projectIcon)) {
+                await joplin.views.dialogs.showToast({message: "Project created successfully", duration: 3000, type: ToastType.Success})
+            } else {
+                await joplin.views.dialogs.showToast({message: "Project creation failed", duration: 3000, type: ToastType.Error})
+            }
         }
     } else {
         await joplin.views.dialogs.showToast({message: "Project creation canceled", duration: 3000, type: ToastType.Info})

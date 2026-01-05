@@ -4,7 +4,7 @@ import {
     readFileContent,
     getPluginFolder,
     writeFileContent,
-    getPluginDataFolder
+    getPluginDataFolder, getSettingValue, isValidWikiStructure
 } from "./utils";
 import * as path from "node:path";
 import { 
@@ -15,16 +15,16 @@ import {
     fetchAllItems 
 } from "./database";
 import { PersistenceService } from "../services/PersistenceService";
+import joplin from "../../api";
+import {ToastType} from "../../api/types";
+import {WikiNode} from "./types";
 
 const logger = Logger.create('Projects: Projects');
-
-type NoteObject = { name: string; content: Array<NoteObject>, is_todo: boolean };
-type NotebookObject = { name: string, children: Array<NotebookObject | NoteObject> };
 
 // Cache to prevent repetitive API scanning for the anchor note during polling
 let anchorValidatedForId: string | null = null;
 
-async function createProjectNotebooksAndNotes(projectStructure: NotebookObject, parent_id: string): Promise<string | null> {
+async function createProjectNotebooksAndNotes(projectStructure: WikiNode, parent_id: string): Promise<string | null> {
     const currentNotebookId = (await createNotebook(projectStructure.name, parent_id)).id
     let tasksFolderId: string | null = null;
 
@@ -187,9 +187,10 @@ async function saveProjectMeta(projectId: string, tasksFolderId: string) {
  * Creates a new project structure from a template.
  * @param projectName The name of the project.
  * @param projectIcon The icon/emoji for the project.
+ * @returns a boolean flag stating if the operation is successful
  */
-export async function createProject(projectName: string, projectIcon: string) {
-    const defaultTemplateFile = path.join(await getPluginFolder(), "gui", "assets", "project_template.json")
+export async function createProject(projectName: string, projectIcon: string): Promise<boolean> {
+    const defaultTemplateFile = path.join(await getPluginFolder(), "gui", "assets", "base_project_template.json")
     const projectTemplate = await readFileContent(defaultTemplateFile)
     if (!projectTemplate) {
         logger.error(`Unable to load the project template: ${defaultTemplateFile}`)
@@ -198,13 +199,39 @@ export async function createProject(projectName: string, projectIcon: string) {
         
         // Use the new robust resolver
         const projectParentNotebookId = await getOrInitProjectRootId();
-        
+
+        let projectWikiTemplateFile = await getSettingValue(Config.SETTINGS.PROJECT_WIKI_TEMPLATE)
+        if(projectWikiTemplateFile.length == 0) {
+            projectWikiTemplateFile = path.join(await getPluginFolder(), "gui", "assets", "new_project_wiki_structure.json")
+        }
+
+        const projectWikiTemplateString = await readFileContent(projectWikiTemplateFile);
+        let projectWikiTemplate = {};
+        if(projectWikiTemplateString.length === 0) {
+            logger.error(`Invalid user defined template path: ${defaultTemplateFile}`)
+            await joplin.views.dialogs.showToast({ message: "Invalid user defined template path", duration: 3000, type: ToastType.Error });
+            return false
+        } else {
+            try {
+                projectWikiTemplate = JSON.parse(projectWikiTemplateString)
+                if(!isValidWikiStructure(projectWikiTemplate)) {
+                    await joplin.views.dialogs.showToast({message: "Invalid user defined template json format.\nCheck the console for details.", duration: 3000, type: ToastType.Error });
+                    return false
+                }
+            } catch (e) {
+                logger.error("Invalid user defined template json format!", e);
+                await joplin.views.dialogs.showToast({ message: "Invalid user defined template json format", duration: 3000, type: ToastType.Error });
+                return false
+            }
+        }
+        projectStructure.children.push(projectWikiTemplate);
+
         // Create the top-level project folder first to get its ID
         const projectRootId = (await createNotebook(projectStructure.name, projectParentNotebookId)).id;
-        
+
         // We need to iterate children of the structure now, passing the new root ID
         let tasksFolderId: string | null = null;
-        
+
         for (const element of projectStructure.children) {
              if ("content" in element) {
                 await createNote(element.name, element.content.join("\n"), element.is_todo, projectRootId);
@@ -220,6 +247,7 @@ export async function createProject(projectName: string, projectIcon: string) {
              await saveProjectMeta(projectRootId, projectRootId);
         }
     }
+    return true
 }
 
 /**

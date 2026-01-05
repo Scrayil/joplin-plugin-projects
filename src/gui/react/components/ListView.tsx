@@ -97,6 +97,7 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
         <div className="list-view-container" style={{ padding: '10px', height: '100%', overflowY: 'auto' }}>
             <table style={{ 
                 width: '100%', 
+                minWidth: '500px',
                 borderCollapse: 'collapse', 
                 color: 'var(--joplin-color)',
                 fontSize: '0.95rem',

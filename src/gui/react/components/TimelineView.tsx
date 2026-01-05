@@ -80,7 +80,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
     };
 
     return (
-        <div className="timeline-container" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--joplin-background-color)', overflow: 'hidden', position: 'relative' }}>
+        <div className="timeline-container" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--joplin-background-color)', overflow: 'hidden', position: 'relative', minWidth: '500px' }}>
                         <div className="timeline-header" style={{ height: '40px', position: 'relative', borderBottom: '1px solid var(--joplin-divider-color)', flexShrink: 0 }}>
                             {[0, 0.25, 0.5, 0.75, 1].map(fraction => {
                                 const time = startRange + (viewDuration * fraction);

@@ -167,7 +167,7 @@ const App: React.FC = () => {
     return (
         <div className="dashboard-container">
             <div className="header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                <div className="controls-container">
                     {data.projects.length > 1 ? (
                         <select 
                             className="project-filter-select"
@@ -196,7 +196,8 @@ const App: React.FC = () => {
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontSize: '1.2rem',
-                            fontWeight: 'bold'
+                            fontWeight: 'bold',
+                            flexShrink: 0
                         }}
                         title="New Task"
                     >
@@ -216,13 +217,14 @@ const App: React.FC = () => {
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontSize: '1rem',
-                            fontWeight: 'bold'
+                            fontWeight: 'bold',
+                            flexShrink: 0
                         }}
                         title="Synchronize"
                     >
                         ↻
                     </button>
-                    <div style={{ marginLeft: '10px', display: 'flex', gap: '10px', borderLeft: '1px solid var(--border-color)', paddingLeft: '15px' }}>
+                    <div className="layout-controls">
                         <button 
                             className="layout-btn"
                             onClick={() => handleToggleLayout('sideBar')}

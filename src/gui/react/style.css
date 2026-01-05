@@ -171,6 +171,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .header h1 {
@@ -207,7 +209,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .content {
     flex: 1;
     padding: 20px;
-    overflow: hidden; /* Important for kanban columns to scroll instead of page */
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
 /* Kanban Styles */
@@ -216,6 +219,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 20px;
     height: 100%;
     align-items: stretch;
+    min-width: fit-content;
 }
 
 .column {
@@ -225,7 +229,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border-radius: 8px;
     display: flex;
     flex-direction: column;
-    min-width: 300px;
+    min-width: 200px;
     max-height: 100%; /* Strictly limit to parent height */
 }
 
@@ -362,7 +366,25 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border-radius: 4px;
     transition: border-color 0.2s;
     color-scheme: inherit; /* Inherit dark/light scheme */
+    max-width: 160px;
+    text-overflow: ellipsis;
+    overflow: hidden;
 }
+
+.controls-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.layout-controls {
+    margin-left: 8px;
+    display: flex;
+    gap: 8px;
+    border-left: 1px solid var(--border-color);
+    padding-left: 8px;
+}
+
 
 .project-filter-select option {
     background-color: var(--joplin-background-color);

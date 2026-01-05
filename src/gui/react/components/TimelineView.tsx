@@ -146,7 +146,8 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                                     top: '42px', 
                                     fontSize: '0.65rem', 
                                     opacity: 0.5,
-                                    whiteSpace: 'nowrap' // Ensure inline
+                                    whiteSpace: 'nowrap', // Ensure inline
+                                    display: width < 15 ? 'none' : 'block'
                                 }}>{formatDate(task.createdTime)}</div>
                                 <div style={{ 
                                     position: 'absolute', 

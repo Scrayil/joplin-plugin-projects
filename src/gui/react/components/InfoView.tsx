@@ -19,6 +19,16 @@ const InfoView: React.FC = () => {
             <section style={{ marginBottom: '30px' }}>
                 <h3 style={{ color: 'var(--text-color)', fontSize: '1.4rem' }}>🗂️ Overview</h3>
                 <p>This plugin helps you manage projects and tasks directly within Joplin. Tasks are identified as "To-do" notes located within the <strong>"Tasks"</strong> sub-folder of your project notebooks.</p>
+                
+                <h4 style={{ marginTop: '15px', color: 'var(--text-color)', fontSize: '1.1rem' }}>How to toggle the Dashboard:</h4>
+                <ul style={{ paddingLeft: '25px', marginTop: '10px' }}>
+                    <li style={{ marginBottom: '8px' }}><strong>Note Toolbar Button:</strong> Click the folder icon (<span
+                        style={{fontFamily: 'monospace'}}><i className="fas fa-folder-open"></i></span>) in the note
+                        toolbar.
+                    </li>
+                    <li style={{ marginBottom: '8px' }}><strong>Menu:</strong> Go to <em>View &gt; Toggle Project Dashboard</em>.</li>
+                    <li style={{ marginBottom: '8px' }}><strong>Shortcut:</strong> Press <code>Ctrl+Alt+P</code> (or <code>Cmd+Opt+P</code> on macOS).</li>
+                </ul>
             </section>
 
             <section style={{ marginBottom: '30px' }}>

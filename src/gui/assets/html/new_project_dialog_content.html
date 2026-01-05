@@ -1480,6 +1480,24 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="form-input-group">
+                    <details class="advanced-section">
+                        <summary>Advanced: Custom Wiki Template</summary>
+                        <div class="file-input-container">
+                            <label for="templateFile" style="font-size: 0.85rem; color: #888; margin-bottom: 8px;">Select a JSON template file to use for this project only.</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input id="templateFile" type="file" accept=".json" class="file-input">
+                                <textarea id="projectTemplateContent" name="projectTemplateContent" style="display: none;"></textarea>
+                            </div>
+                            <div id="file-status" class="file-status"></div>
+                        </div>
+                    </details>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
             </form>
         </div>
     </div>

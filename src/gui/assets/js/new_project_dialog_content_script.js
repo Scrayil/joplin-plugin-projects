@@ -474,6 +474,39 @@ const initPlugin = () => {
         });
     };
 
+    const templateFileInput = document.getElementById('templateFile');
+    const templateContentArea = document.getElementById('projectTemplateContent');
+    const fileStatus = document.getElementById('file-status');
+
+    if (templateFileInput) {
+        templateFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) {
+                templateContentArea.value = '';
+                fileStatus.style.display = 'none';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    // Basic validation that it looks like JSON
+                    const json = JSON.parse(event.target.result);
+                    templateContentArea.value = JSON.stringify(json); // Store minified JSON
+                    fileStatus.textContent = `Loaded: ${file.name}`;
+                    fileStatus.style.color = 'green';
+                    fileStatus.style.display = 'block';
+                } catch (err) {
+                    templateContentArea.value = '';
+                    fileStatus.textContent = 'Error: Invalid JSON file';
+                    fileStatus.style.color = 'red';
+                    fileStatus.style.display = 'block';
+                }
+            };
+            reader.readAsText(file);
+        });
+    }
+
     if (triggerBtn) {
         triggerBtn.addEventListener('click', (e) => {
             e.stopPropagation();

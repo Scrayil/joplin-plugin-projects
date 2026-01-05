@@ -36,13 +36,15 @@ export async function newProjectDialog() {
         const formData = result.formData?.['projectForm']
         const projectName = formData?.['projectName']
         const projectIcon = formData?.['projectIcon']
+        const projectTemplateContent = formData?.['projectTemplateContent']
 
         if(projectName.length === 0) {
             logger.error("No project name provided")
             await joplin.views.dialogs.showToast({message: "Project name required", duration: 3000, type: ToastType.Error})
         } else {
             logger.info(`Creating project: ${projectIcon} ${projectName}`);
-            if(await createProject(projectName, projectIcon)) {
+            // Pass content as 3rd arg
+            if(await createProject(projectName, projectIcon, projectTemplateContent)) {
                 await joplin.views.dialogs.showToast({message: "Project created successfully", duration: 3000, type: ToastType.Success})
             } else {
                 await joplin.views.dialogs.showToast({message: "Project creation failed", duration: 3000, type: ToastType.Error})

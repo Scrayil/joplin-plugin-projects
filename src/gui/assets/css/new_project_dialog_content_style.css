@@ -28,7 +28,6 @@ body {
     position: relative;
     display: flex;
     flex-direction: column;
-    /* overflow: hidden;  <-- Rimosso per evitare tagli di ombre, ma gestito dal container */
 }
 
 /* 3. Stato Espanso (Attivato via JS) */
@@ -63,6 +62,68 @@ input[type="text"] {
     color: white;
     border-radius: 4px;
     box-sizing: border-box;
+}
+
+/* --- ADVANCED SECTION & FILE INPUT --- */
+details.advanced-section {
+    background: #25282C;
+    border: 1px solid #444;
+    border-radius: 4px;
+    margin-top: 20px;
+}
+
+details.advanced-section summary {
+    padding: 10px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #888;
+    outline: none;
+    user-select: none;
+}
+
+details.advanced-section summary:hover {
+    color: #bbb;
+    background: rgba(255,255,255,0.05);
+}
+
+.file-input-container {
+    padding: 15px;
+    border-top: 1px solid #444;
+}
+
+.file-input {
+    width: 100%;
+    padding: 8px;
+    background: #1D2024;
+    border: 1px solid #555;
+    color: #ccc;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+/* Custom file button styling */
+.file-input::file-selector-button {
+    background-color: #3D4146;
+    color: white;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 5px 10px;
+    margin-right: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.file-input::file-selector-button:hover {
+    background-color: #4D5156;
+}
+
+.file-status {
+    font-size: 0.85rem;
+    margin-top: 8px;
+    padding-left: 4px;
+    display: none; /* Hidden by default */
 }
 
 .icon-selector-row {

@@ -189,11 +189,18 @@ async function saveProjectMeta(projectId: string, tasksFolderId: string) {
 
 /**
  * Retrieves the user-defined wiki template content.
- * Falls back to the default asset file if no setting is provided.
- * @returns Promise containing the JSON string or null if invalid
+ * Falls back to the provided custom content (one-off), then the setting, then the default asset file.
  */
-async function getWikiTemplateContent(): Promise<string | null> {
+async function getWikiTemplateContent(customContent?: string): Promise<string | null> {
+    // 1. Priority: One-off custom content from dialog
+    if (customContent && customContent.trim().length > 0) {
+        return customContent;
+    }
+
+    // 2. Priority: Global Setting
     let templatePath = await getSettingValue(Config.SETTINGS.PROJECT_WIKI_TEMPLATE);
+
+    // 3. Priority: Default Asset
     if (!templatePath || templatePath.length === 0) {
         templatePath = path.join(await getPluginFolder(), "gui", "assets", "new_project_wiki_structure.json");
     }
@@ -202,9 +209,9 @@ async function getWikiTemplateContent(): Promise<string | null> {
     if (!content || content.length === 0) {
         logger.error(`Invalid template path or empty file: ${templatePath}`);
         await joplin.views.dialogs.showToast({
-            message: "Invalid user defined template path", 
-            duration: 3000, 
-            type: ToastType.Error 
+            message: "Invalid user defined template path",
+            duration: 3000,
+            type: ToastType.Error
         });
         return null;
     }
@@ -213,17 +220,15 @@ async function getWikiTemplateContent(): Promise<string | null> {
 
 /**
  * Parses and validates the wiki template JSON structure.
- * @param jsonContent the JSON string to parse and validate
- * @returns Promise containing the parsed JSON or null if invalid
  */
 async function parseAndValidateTemplate(jsonContent: string): Promise<any | null> {
     try {
         const template = JSON.parse(jsonContent);
         if (!isValidWikiStructure(template)) {
             await joplin.views.dialogs.showToast({
-                message: "Invalid user defined template json format.\nCheck the console for details.", 
-                duration: 3000, 
-                type: ToastType.Error 
+                message: "Invalid user defined template json format.\nCheck the console for details.",
+                duration: 3000,
+                type: ToastType.Error
             });
             return null;
         }
@@ -231,9 +236,9 @@ async function parseAndValidateTemplate(jsonContent: string): Promise<any | null
     } catch (e) {
         logger.error("Invalid user defined template json format!", e);
         await joplin.views.dialogs.showToast({
-            message: "Invalid user defined template json format", 
-            duration: 3000, 
-            type: ToastType.Error 
+            message: "Invalid user defined template json format",
+            duration: 3000,
+            type: ToastType.Error
         });
         return null;
     }
@@ -243,9 +248,10 @@ async function parseAndValidateTemplate(jsonContent: string): Promise<any | null
  * Creates a new project structure from a template.
  * @param projectName The name of the project.
  * @param projectIcon The icon/emoji for the project.
+ * @param customTemplateContent Optional JSON string content of a specific wiki template to use.
  * @returns a boolean flag stating if the operation is successful
  */
-export async function createProject(projectName: string, projectIcon: string): Promise<boolean> {
+export async function createProject(projectName: string, projectIcon: string, customTemplateContent?: string): Promise<boolean> {
     const defaultTemplateFile = path.join(await getPluginFolder(), "gui", "assets", "base_project_template.json");
     const projectTemplateString = await readFileContent(defaultTemplateFile);
     
@@ -254,20 +260,19 @@ export async function createProject(projectName: string, projectIcon: string): P
         return false;
     }
 
-    // Preparing base structure
+    // 1. Prepare Base Structure
     const projectStructure = JSON.parse(
         projectTemplateString
             .replace("<PRJ_ICON> ", projectIcon.length > 0 ? projectIcon + " " : projectIcon)
             .replace("<PRJ_NAME>", projectName)
     );
 
-    // Fetching and validating Wiki template
-    const wikiTemplateContent = await getWikiTemplateContent();
+    // 2. Fetch and Validate Wiki Template
+    const wikiTemplateContent = await getWikiTemplateContent(customTemplateContent);
     if (!wikiTemplateContent) return false;
 
     const wikiTemplate = await parseAndValidateTemplate(wikiTemplateContent);
     if (!wikiTemplate) return false;
-
     // Merging templates
     if (!projectStructure.children) projectStructure.children = [];
     projectStructure.children.push(wikiTemplate);

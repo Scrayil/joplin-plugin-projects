@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Task } from '../types';
+import {formatDate} from "../utils";
 
 interface ListViewProps {
     tasks: Task[];
@@ -76,23 +77,6 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
         );
     };
 
-    const formatDate = (timestamp: number, includeTime: boolean = false) => {
-        const date = new Date(timestamp);
-        const options: Intl.DateTimeFormatOptions = { 
-            day: 'numeric', 
-            month: 'short', 
-            year: 'numeric' 
-        };
-        
-        if (includeTime) {
-            options.hour = '2-digit';
-            options.minute = '2-digit';
-            options.hour12 = true;
-        }
-        
-        return date.toLocaleDateString('en-GB', options).replace(/,/g, '');
-    };
-
     return (
         <div className="list-view-container" style={{ padding: '10px', height: '100%', overflowY: 'auto' }}>
             <table style={{ 
@@ -128,6 +112,7 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
                                     style={{ borderBottom: '1px solid var(--joplin-divider-color)', transition: 'background 0.2s', cursor: 'pointer' }}
                                     onClick={() => onOpenNote(task.id)}
                                     onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
+                                    title={`${task.title}\n${task.dueDate > 0 ? `Due: ${formatDate(task.dueDate)}` : ''}`}
                                 >
                                     <td style={{ 
                                         padding: '12px 10px', 
@@ -136,7 +121,7 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
                                         whiteSpace: 'nowrap',
                                         overflow: 'hidden',
                                         textOverflow: 'ellipsis'
-                                    }} title={task.projectName}>
+                                    }}>
                                         <span style={{ color: 'orange', fontWeight: 'bold', fontSize: '1rem' }}>[{task.projectName}]</span>
                                     </td>
                                     <td style={{ 
@@ -147,7 +132,7 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
                                         whiteSpace: 'nowrap',
                                         overflow: 'hidden',
                                         textOverflow: 'ellipsis'
-                                    }} title={task.title}>
+                                    }}>
                                         {task.title}
                                     </td>
                                     <td style={{ padding: '12px 10px', borderRight: '1px solid var(--joplin-divider-color)' }}>
@@ -159,7 +144,7 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
                                     <td style={{ padding: '12px 10px', fontSize: '0.85rem' }}>
                                         {task.dueDate && task.dueDate > 0 ? (
                                             <span style={{ color: task.dueDate < Date.now() ? '#e74c3c' : 'inherit', fontWeight: task.dueDate < Date.now() ? 'bold' : 'normal' }}>
-                                                {formatDate(task.dueDate, true)}
+                                                {formatDate(task.dueDate, false)}
                                             </span>
                                         ) : (
                                             <span style={{ opacity: 0.3 }}>-</span>

@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Task } from '../types';
+import {formatDate} from "../utils";
 
 interface TimelineViewProps {
     tasks: Task[];
@@ -62,23 +63,6 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
     const getPosition = (time: number) => ((time - startRange) / viewDuration) * 100;
     const nowPos = getPosition(now);
 
-    const formatDate = (timestamp: number, includeTime: boolean = false) => {
-        const date = new Date(timestamp);
-        const options: Intl.DateTimeFormatOptions = { 
-            day: 'numeric', 
-            month: 'short', 
-            year: 'numeric' 
-        };
-        
-        if (includeTime) {
-            options.hour = '2-digit';
-            options.minute = '2-digit';
-            options.hour12 = true;
-        }
-        
-        return date.toLocaleDateString('en-GB', options).replace(/,/g, '');
-    };
-
     return (
         <div className="timeline-container" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--joplin-background-color)', overflow: 'hidden', position: 'relative', minWidth: '500px' }}>
                         <div className="timeline-header" style={{ height: '40px', position: 'relative', borderBottom: '1px solid var(--joplin-divider-color)', flexShrink: 0 }}>
@@ -100,7 +84,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                                         whiteSpace: 'nowrap',
                                         padding: '0 5px'
                                     }}>
-                                        {formatDate(time)}
+                                        {formatDate(time, false)}
                                     </div>
                                 );
                             })}
@@ -124,7 +108,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                             <div key={task.id} className={`timeline-row ${isOverdue ? 'overdue' : ''}`} style={{ height: '60px', position: 'relative', borderBottom: '1px solid var(--joplin-divider-color)', margin: '0 10px', cursor: 'pointer' }} 
                                  onClick={() => onOpenNote(task.id)}
                                  onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
-                                 title={`${task.title}\nDue: ${formatDate(task.dueDate!, true)}`}>
+                                 title={`${task.title}\nDue: ${formatDate(task.dueDate!)}`}>
                                 <div style={{ position: 'absolute', left: `${startPos}%`, top: '5px', fontSize: '0.9rem', color: 'var(--joplin-color)', whiteSpace: 'nowrap', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: projectColor, display: 'inline-block', flexShrink: 0 }}></span>
                                     <span style={{ color: 'orange' }}>[{task.projectName}]</span> {task.title}
@@ -148,7 +132,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                                     opacity: 0.5,
                                     whiteSpace: 'nowrap', // Ensure inline
                                     display: width < 15 ? 'none' : 'block'
-                                }}>{formatDate(task.createdTime)}</div>
+                                }}>{formatDate(task.createdTime, false)}</div>
                                 <div style={{ 
                                     position: 'absolute', 
                                     left: width < 15 ? `${startPos}%` : `${endPos}%`, 
@@ -158,7 +142,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                                     opacity: 0.5, 
                                     textAlign: width < 15 ? 'left' : 'right',
                                     whiteSpace: 'nowrap' // Ensure inline
-                                }}>{formatDate(task.dueDate!)}</div>
+                                }}>{formatDate(task.dueDate!, false)}</div>
                             </div>
                         );
                     })}

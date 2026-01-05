@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Task, Project } from '../types';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
+import {formatDate} from "../utils";
 
 interface KanbanBoardProps {
     tasks: Task[];
@@ -95,19 +96,6 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStat
         );
     };
 
-    const formatDate = (timestamp: number) => {
-        const date = new Date(timestamp);
-        const options: Intl.DateTimeFormatOptions = { 
-            day: 'numeric', 
-            month: 'short', 
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-        };
-        return date.toLocaleDateString('en-GB', options).replace(/,/g, '');
-    };
-
     const renderColumn = (status: string, title: string) => {
         const columnTasks = getTasksByStatus(status);
         let displayedTasks = columnTasks;
@@ -143,6 +131,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStat
                                                 style={{ ...provided.draggableProps.style, cursor: 'pointer' }}
                                                 onClick={() => onOpenNote(task.id)}
                                                 onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
+                                                title={`${task.title}\n${task.dueDate > 0 ? `Due: ${formatDate(task.dueDate)}` : ''}`}
                                             >
                                                 <div className="task-title">
                                                     <span className="task-project-tag">[{task.projectName}]</span>

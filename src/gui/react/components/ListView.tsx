@@ -129,7 +129,14 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
                                     onClick={() => onOpenNote(task.id)}
                                     onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
                                 >
-                                    <td style={{ padding: '12px 10px', borderRight: '1px solid var(--joplin-divider-color)' }}>
+                                    <td style={{ 
+                                        padding: '12px 10px', 
+                                        borderRight: '1px solid var(--joplin-divider-color)',
+                                        maxWidth: '120px', /* Limit width */
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis'
+                                    }} title={task.projectName}>
                                         <span style={{ color: 'orange', fontWeight: 'bold' }}>[{task.projectName}]</span>
                                     </td>
                                     <td style={{ 

@@ -274,6 +274,12 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     font-weight: 600;
     line-height: 1.4;
     margin-bottom: 4px;
+    /* Multi-line truncation */
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
     word-break: break-word;
 }
 

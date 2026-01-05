@@ -151,12 +151,12 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                                 }}>{formatDate(task.createdTime)}</div>
                                 <div style={{ 
                                     position: 'absolute', 
-                                    left: `${endPos}%`, 
+                                    left: width < 15 ? `${startPos}%` : `${endPos}%`, 
                                     top: '42px', 
                                     fontSize: '0.65rem', 
-                                    transform: 'translateX(-100%)', 
+                                    transform: width < 15 ? 'none' : 'translateX(-100%)', 
                                     opacity: 0.5, 
-                                    textAlign: 'right',
+                                    textAlign: width < 15 ? 'left' : 'right',
                                     whiteSpace: 'nowrap' // Ensure inline
                                 }}>{formatDate(task.dueDate!)}</div>
                             </div>

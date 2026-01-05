@@ -33,6 +33,7 @@ body {
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
+    border-left: 1px solid var(--border-color); /* Visual separation from editor */
 }
 
 /* Modal Styles */

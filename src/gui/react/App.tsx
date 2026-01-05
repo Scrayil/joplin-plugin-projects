@@ -169,57 +169,33 @@ const App: React.FC = () => {
             <div className="header">
                 <div className="controls-container">
                     {data.projects.length > 1 ? (
-                        <select 
-                            className="project-filter-select"
-                            value={projectFilter} 
-                            onChange={(e) => setProjectFilter(e.target.value)}
-                        >
-                            <option value="all">All Tasks</option>
-                            {data.projects.map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
-                        </select>
+                        <div className="select-wrapper">
+                            <select 
+                                className="project-filter-select"
+                                value={projectFilter} 
+                                onChange={(e) => setProjectFilter(e.target.value)}
+                            >
+                                <option value="all">All Tasks</option>
+                                {data.projects.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
+                        </div>
                     ) : (
                         <h1>All Tasks</h1>
                     )}
                     <button 
+                        className="action-btn"
                         onClick={handleOpenCreateTaskDialog} 
-                        style={{ 
-                            background: 'var(--primary-btn-bg)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '50%',
-                            width: '32px',
-                            height: '32px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '1.2rem',
-                            fontWeight: 'bold',
-                            flexShrink: 0
-                        }}
+                        style={{ fontSize: '1.2rem' }}
                         title="New Task"
                     >
                         +
                     </button>
                     <button 
+                        className="action-btn"
                         onClick={handleSync} 
-                        style={{ 
-                            background: 'var(--primary-btn-bg)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '50%',
-                            width: '32px',
-                            height: '32px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '1rem',
-                            fontWeight: 'bold',
-                            flexShrink: 0
-                        }}
+                        style={{ fontSize: '1rem' }}
                         title="Synchronize"
                     >
                         ↻

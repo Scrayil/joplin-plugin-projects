@@ -203,8 +203,30 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .tabs button.active {
-    background-color: var(--primary-btn-bg);
-    color: #ffffff;
+    background-color: rgba(127, 127, 127, 0.2) !important;
+    color: var(--text-color) !important;
+    font-weight: 700;
+    border: 1px solid var(--border-color);
+}
+
+.action-btn {
+    background-color: rgba(127, 127, 127, 0.2) !important;
+    color: var(--text-color) !important;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    flex-shrink: 0;
+    transition: background 0.2s;
+}
+
+.action-btn:hover {
+    background-color: rgba(127, 127, 127, 0.3) !important;
 }
 
 .content {
@@ -354,6 +376,25 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     margin-bottom: 20px;
 }
 
+.select-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    max-width: 160px;
+}
+
+.select-wrapper::after {
+    content: "";
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-25%);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid var(--text-color); /* Inherits theme text color */
+    pointer-events: none;
+}
+
 .project-filter-select {
     font-size: 1.2rem;
     font-weight: 600;
@@ -361,19 +402,14 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     background: transparent;
     border: 1px solid transparent;
     cursor: pointer;
-    padding: 4px 35px 4px 10px; /* Right padding for arrow */
+    padding: 4px 35px 4px 10px; /* Space for arrow */
     margin-left: -10px;
     outline: none;
     appearance: none;
     -webkit-appearance: none;
-    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23333%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
-    background-repeat: no-repeat;
-    background-position: right 10px top 50%;
-    background-size: 0.65em auto;
     border-radius: 4px;
     transition: border-color 0.2s;
-    color-scheme: inherit; /* Inherit dark/light scheme */
-    max-width: 160px;
+    width: 100%;
     text-overflow: ellipsis;
     overflow: hidden;
 }
@@ -402,12 +438,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border-color: var(--border-color);
 }
 
-/* Dark mode adjustment for the arrow icon in select */
-@media (prefers-color-scheme: dark) {
-    .project-filter-select {
-        background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23ffffff%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
-    }
-}
+
 
 .form-group {
     margin-bottom: 15px;

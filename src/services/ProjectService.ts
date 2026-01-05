@@ -1,12 +1,11 @@
-import joplin from 'api';
 import { Config } from '../utils/constants';
 import { getPluginDataFolder, readFileContent } from '../utils/utils';
 import { TagService } from './TagService';
 import { NoteParser } from './NoteParser';
 import * as path from 'path';
 import * as fs from 'fs';
-import { PersistenceService } from './PersistenceService';
 import { getOrInitProjectRootId } from '../utils/projects';
+import { fetchAllItems, getNote } from '../utils/database';
 
 /**
  * Service responsible for aggregating project data, scanning folders, and maintaining the dashboard state.
@@ -99,7 +98,7 @@ export class ProjectService {
         let maxUpdated = 0;
 
         for (const folderId of foldersToScan) {
-            const notes = await this.fetchAllItems(['folders', folderId, 'notes'], {
+            const notes = await fetchAllItems(['folders', folderId, 'notes'], {
                 fields: ['id', 'updated_time', 'is_todo', 'parent_id', 'title', 'todo_completed', 'todo_due', 'created_time']
             });
             const todos = notes.filter((n: any) => n.is_todo);
@@ -135,7 +134,7 @@ export class ProjectService {
         for (let i = 0; i < validTodosMetadata.length; i += batchSize) {
             const batch = validTodosMetadata.slice(i, i + batchSize);
             const batchResults = await Promise.all(batch.map(async (n) => {
-                 const noteWithBody = await joplin.data.get(['notes', n.id], { fields: ['body'] });
+                 const noteWithBody = await getNote(n.id, ['body']);
                  return { ...n, body: noteWithBody.body };
             }));
             notesWithBody.push(...batchResults);
@@ -186,28 +185,11 @@ export class ProjectService {
     }
 
     /**
-     * Generic helper to fetch all items from the Joplin Data API, handling pagination automatically.
-     * 
-     * @param path The API path segments (e.g., ['folders'] or ['folders', id, 'notes']).
-     * @param query Optional query parameters.
-     * @returns A promise resolving to an array of all items found.
+     * Forcefully invalidates the dashboard cache.
+     * Useful when changes (like tag updates) might not be reflected in the note's updated_time.
      */
-    private async fetchAllItems(path: string[], query: any = null) {
-        let page = 1;
-        let items: any[] = [];
-        let response;
-        
-        do {
-            const options: any = { page: page, limit: 100 };
-            if (query) {
-                 Object.assign(options, query);
-            }
-            response = await joplin.data.get(path, options);
-            items = items.concat(response.items);
-            page++;
-        } while (response.has_more);
-
-        return items;
+    public invalidateCache() {
+        this.lastSignature = '';
     }
 
     /**
@@ -217,7 +199,7 @@ export class ProjectService {
      * @returns A promise resolving to an array of folder objects.
      */
     private async fetchAllFolders(fields: string[] = ['id', 'parent_id', 'title']) {
-        return await this.fetchAllItems(['folders'], { fields: fields });
+        return await fetchAllItems(['folders'], { fields: fields });
     }
     
     /**

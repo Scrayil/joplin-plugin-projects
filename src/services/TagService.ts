@@ -1,6 +1,6 @@
-import joplin from 'api';
 import { Config } from '../utils/constants';
 import { getPluginDataFolder, readFileContent, writeFileContent } from '../utils/utils';
+import { getTag, searchTags, createTag, addTagToNote, removeTagFromNote, fetchAllItems } from '../utils/database';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -54,7 +54,7 @@ export class TagService {
         if (tagId) {
             try {
                 // Check if tag still exists
-                const tag = await joplin.data.get(['tags', tagId], { fields: ['id'] });
+                const tag = await getTag(tagId, ['id']);
                 if (tag) {
                     // Tag exists, we use it regardless of its current title
                     return tagId;
@@ -65,11 +65,11 @@ export class TagService {
         }
 
         // ID not found or invalid. Search by name or create.
-        const search = await joplin.data.get(['search'], { query: defaultTitle, type: 'tag' });
+        const search = await searchTags(defaultTitle);
         if (search.items.length > 0) {
             tagId = search.items[0].id;
         } else {
-            const newTag = await joplin.data.post(['tags'], null, { title: defaultTitle });
+            const newTag = await createTag(defaultTitle);
             tagId = newTag.id;
         }
 
@@ -105,7 +105,7 @@ export class TagService {
      * Helper to fetch tags for a single note.
      */
     private async fetchTagsForNote(noteId: string): Promise<{ id: string, tags: string[] }> {
-        const tags = await this.fetchAllItems(['notes', noteId, 'tags'], { fields: ['title'] });
+        const tags = await fetchAllItems(['notes', noteId, 'tags'], { fields: ['title'] });
         return {
             id: noteId,
             tags: tags.map((t: any) => t.title)
@@ -122,7 +122,7 @@ export class TagService {
         const idsToRemove = [highId, mediumId, lowId];
         for (const id of idsToRemove) {
             try {
-                await joplin.data.delete(['tags', id, 'notes', taskId]);
+                await removeTagFromNote(id, taskId);
             } catch (e) { /* Ignore if not present */ }
         }
 
@@ -131,39 +131,18 @@ export class TagService {
         if (urgency === 'high') targetId = highId;
         if (urgency === 'low') targetId = lowId;
         
-        await joplin.data.post(['tags', targetId, 'notes'], null, { id: taskId });
+        await addTagToNote(targetId, taskId);
     }
 
     public async updateStatusTags(taskId: string, newStatus: string): Promise<void> {
         const inProgressId = await this.getEffectiveTagId('IN_PROGRESS', Config.TAGS.IN_PROGRESS);
 
         if (newStatus === 'in_progress') {
-            await joplin.data.post(['tags', inProgressId, 'notes'], null, { id: taskId });
+            await addTagToNote(inProgressId, taskId);
         } else {
             try {
-                await joplin.data.delete(['tags', inProgressId, 'notes', taskId]);
+                await removeTagFromNote(inProgressId, taskId);
             } catch (e) { /* Ignore */ }
         }
-    }
-
-    /**
-     * Generic helper to fetch all items with pagination.
-     */
-    private async fetchAllItems(path: string[], query: any = null) {
-        let page = 1;
-        let items: any[] = [];
-        let response;
-        
-        do {
-            const options: any = { page: page, limit: 100 };
-            if (query) {
-                 Object.assign(options, query);
-            }
-            response = await joplin.data.get(path, options);
-            items = items.concat(response.items);
-            page++;
-        } while (response.has_more);
-
-        return items;
     }
 }

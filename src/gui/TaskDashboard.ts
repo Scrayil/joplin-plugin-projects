@@ -1,7 +1,7 @@
 import joplin from 'api';
 import { ToastType } from "api/types";
 import { Config } from "../utils/constants";
-import { createNote } from "../utils/database";
+import { createNote, updateNote, getNote, deleteNote } from "../utils/database";
 import { newTaskDialog, editTaskDialog, newProjectDialog } from "./dialogs";
 import { getAllProjects } from "../utils/projects";
 import { NoteParser } from '../services/NoteParser';
@@ -97,9 +97,18 @@ export class TaskDashboard {
             debounceTimer = setTimeout(async () => {
                 const isVisible = await joplin.views.panels.visible(this.panelHandle);
                 if (isVisible) {
+                    this.projectService.invalidateCache();
                     await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
                 }
             }, 500); 
+        });
+
+        await joplin.workspace.onNoteSelectionChange(async () => {
+            const isVisible = await joplin.views.panels.visible(this.panelHandle);
+            if (isVisible) {
+                this.projectService.invalidateCache();
+                await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
+            }
         });
     }
 
@@ -135,7 +144,7 @@ export class TaskDashboard {
                 } else if (result.action === 'delete') {
                     const confirmed = await joplin.views.dialogs.showMessageBox(`Are you sure you want to delete the task "${task.title}"?`);
                     if (confirmed === 0) {
-                        await joplin.data.delete(['notes', task.id]);
+                        await deleteNote(task.id);
                         await joplin.views.dialogs.showToast({ message: "Task deleted successfully", duration: 3000, type: ToastType.Success });
                     } else {
                         await joplin.views.dialogs.showToast({ message: "Task deletion canceled", duration: 3000, type: ToastType.Info });
@@ -198,7 +207,7 @@ export class TaskDashboard {
             const note = await createNote(payload.title, body, true, tasksFolderId);
 
             if (payload.dueDate) {
-                await joplin.data.put(['notes', note.id], null, { todo_due: payload.dueDate });
+                await updateNote(note.id, { todo_due: payload.dueDate });
             }
 
             if (payload.urgency && payload.urgency !== Config.TAGS.KEYWORDS.NORMAL) {
@@ -223,10 +232,10 @@ export class TaskDashboard {
     private async updateTask(taskId: string, payload: { subTasks: string[]; urgency: string; dueDate: number }) {
         try {
             // Fetch current note body to preserve non-checklist content
-            const currentNote = await joplin.data.get(['notes', taskId], { fields: ['body'] });
+            const currentNote = await getNote(taskId, ['body']);
             const body = this.noteParser.updateNoteBodyWithSubTasks(currentNote.body, payload.subTasks);
             
-            await joplin.data.put(['notes', taskId], null, { 
+            await updateNote(taskId, { 
                 body: body,
                 todo_due: payload.dueDate
             });
@@ -247,7 +256,7 @@ export class TaskDashboard {
     private async updateTaskStatus(payload: { taskId: string, newStatus: string }) {
         const { taskId, newStatus } = payload;
         
-        const note = await joplin.data.get(['notes', taskId], { fields: ['body', 'todo_completed'] });
+        const note = await getNote(taskId, ['body', 'todo_completed']);
         const isCompleted = newStatus === 'done';
         
         const updates: any = {
@@ -259,7 +268,7 @@ export class TaskDashboard {
             updates.body = newBody;
         }
 
-        await joplin.data.put(['notes', taskId], null, updates);
+        await updateNote(taskId, updates);
         await this.tagService.updateStatusTags(taskId, newStatus);
 
         return { success: true };
@@ -269,11 +278,11 @@ export class TaskDashboard {
      * Toggles a specific subtask checkbox within the note markdown body.
      */
     private async toggleSubTask(payload: { taskId: string, subTaskTitle: string, checked: boolean }) {
-        const note = await joplin.data.get(['notes', payload.taskId], { fields: ['body'] });
+        const note = await getNote(payload.taskId, ['body']);
         const newBody = this.noteParser.updateSubTaskStatus(note.body, payload.subTaskTitle, payload.checked);
         
         if (newBody !== note.body) {
-            await joplin.data.put(['notes', payload.taskId], null, { body: newBody });
+            await updateNote(payload.taskId, { body: newBody });
         }
 
         return { success: true };

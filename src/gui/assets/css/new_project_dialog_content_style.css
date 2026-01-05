@@ -171,7 +171,7 @@ details.advanced-section summary:hover {
 
 .emoji-picker__search-container {
     padding: 10px;
-    background: var(--joplin-background-color-hover3);
+    background: var(--joplin-background-color);
     border-bottom: 1px solid rgba(127, 127, 127, 0.5);
     position: relative;
     flex-shrink: 0;
@@ -198,7 +198,7 @@ details.advanced-section summary:hover {
 .emoji-picker__category-buttons {
     display: flex;
     overflow-x: auto;
-    background: var(--joplin-background-color-hover3);
+    background: var(--joplin-background-color);
     border-bottom: 1px solid rgba(127, 127, 127, 0.5);
     padding: 5px;
     flex-shrink: 0;
@@ -220,7 +220,7 @@ details.advanced-section summary:hover {
 .emoji-picker__category-button.active {
     color: var(--joplin-selected-color);
     opacity: 1;
-    background: rgba(128,128,128,0.1);
+    background: rgba(127, 127, 127, 0.1);
     border-radius: 4px;
 }
 
@@ -285,7 +285,7 @@ details.advanced-section summary:hover {
 }
 
 .emoji-picker__emoji:hover {
-    background-color: var(--joplin-background-color-hover3);
+    background-color: rgba(127, 127, 127, 0.1);
     transform: scale(1.1);
     transition: transform 0.1s;
 }
@@ -298,6 +298,6 @@ details.advanced-section summary:hover {
     padding: 0 15px;
     font-size: 0.9rem;
     color: var(--joplin-color);
-    background: var(--joplin-background-color-hover3);
+    background: var(--joplin-background-color);
     flex-shrink: 0;
 }

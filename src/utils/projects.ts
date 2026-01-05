@@ -4,7 +4,9 @@ import {
     readFileContent,
     getPluginFolder,
     writeFileContent,
-    getPluginDataFolder, getSettingValue, isValidWikiStructure
+    getPluginDataFolder, 
+    getSettingValue, 
+    isValidWikiStructure
 } from "./utils";
 import * as path from "node:path";
 import { 
@@ -16,8 +18,8 @@ import {
 } from "./database";
 import { PersistenceService } from "../services/PersistenceService";
 import joplin from "../../api";
-import {ToastType} from "../../api/types";
-import {WikiNode} from "./types";
+import { ToastType } from "../../api/types";
+import { WikiNode } from "./types";
 
 const logger = Logger.create('Projects: Projects');
 
@@ -25,19 +27,21 @@ const logger = Logger.create('Projects: Projects');
 let anchorValidatedForId: string | null = null;
 
 async function createProjectNotebooksAndNotes(projectStructure: WikiNode, parent_id: string): Promise<string | null> {
-    const currentNotebookId = (await createNotebook(projectStructure.name, parent_id)).id
+    const currentNotebookId = (await createNotebook(projectStructure.name, parent_id)).id;
     let tasksFolderId: string | null = null;
 
     if (projectStructure.name.includes(Config.FOLDERS.TASKS)) {
         tasksFolderId = currentNotebookId;
     }
 
-    for (const element of projectStructure.children) {
-        if ("content" in element) {
-            await createNote(element.name, element.content.join("\n"), element.is_todo, currentNotebookId);
-        } else {
-            const childTaskId = await createProjectNotebooksAndNotes(element, currentNotebookId);
-            if (childTaskId) tasksFolderId = childTaskId;
+    if (projectStructure.children) {
+        for (const element of projectStructure.children) {
+            if ("content" in element) {
+                await createNote(element.name, element.content.join("\n"), element.is_todo, currentNotebookId);
+            } else {
+                const childTaskId = await createProjectNotebooksAndNotes(element, currentNotebookId);
+                if (childTaskId) tasksFolderId = childTaskId;
+            }
         }
     }
     return tasksFolderId;
@@ -184,70 +188,115 @@ async function saveProjectMeta(projectId: string, tasksFolderId: string) {
 }
 
 /**
+ * Retrieves the user-defined wiki template content.
+ * Falls back to the default asset file if no setting is provided.
+ * @returns Promise containing the JSON string or null if invalid
+ */
+async function getWikiTemplateContent(): Promise<string | null> {
+    let templatePath = await getSettingValue(Config.SETTINGS.PROJECT_WIKI_TEMPLATE);
+    if (!templatePath || templatePath.length === 0) {
+        templatePath = path.join(await getPluginFolder(), "gui", "assets", "new_project_wiki_structure.json");
+    }
+
+    const content = await readFileContent(templatePath);
+    if (!content || content.length === 0) {
+        logger.error(`Invalid template path or empty file: ${templatePath}`);
+        await joplin.views.dialogs.showToast({
+            message: "Invalid user defined template path", 
+            duration: 3000, 
+            type: ToastType.Error 
+        });
+        return null;
+    }
+    return content;
+}
+
+/**
+ * Parses and validates the wiki template JSON structure.
+ * @param jsonContent the JSON string to parse and validate
+ * @returns Promise containing the parsed JSON or null if invalid
+ */
+async function parseAndValidateTemplate(jsonContent: string): Promise<any | null> {
+    try {
+        const template = JSON.parse(jsonContent);
+        if (!isValidWikiStructure(template)) {
+            await joplin.views.dialogs.showToast({
+                message: "Invalid user defined template json format.\nCheck the console for details.", 
+                duration: 3000, 
+                type: ToastType.Error 
+            });
+            return null;
+        }
+        return template;
+    } catch (e) {
+        logger.error("Invalid user defined template json format!", e);
+        await joplin.views.dialogs.showToast({
+            message: "Invalid user defined template json format", 
+            duration: 3000, 
+            type: ToastType.Error 
+        });
+        return null;
+    }
+}
+
+/**
  * Creates a new project structure from a template.
  * @param projectName The name of the project.
  * @param projectIcon The icon/emoji for the project.
  * @returns a boolean flag stating if the operation is successful
  */
 export async function createProject(projectName: string, projectIcon: string): Promise<boolean> {
-    const defaultTemplateFile = path.join(await getPluginFolder(), "gui", "assets", "base_project_template.json")
-    const projectTemplate = await readFileContent(defaultTemplateFile)
-    if (!projectTemplate) {
-        logger.error(`Unable to load the project template: ${defaultTemplateFile}`)
-    } else {
-        const projectStructure = JSON.parse(projectTemplate.replace("<PRJ_ICON> ", projectIcon.length > 0 ? projectIcon + " " : projectIcon).replace("<PRJ_NAME>", projectName))
-        
-        // Use the new robust resolver
-        const projectParentNotebookId = await getOrInitProjectRootId();
+    const defaultTemplateFile = path.join(await getPluginFolder(), "gui", "assets", "base_project_template.json");
+    const projectTemplateString = await readFileContent(defaultTemplateFile);
+    
+    if (!projectTemplateString) {
+        logger.error(`Unable to load the base project template: ${defaultTemplateFile}`);
+        return false;
+    }
 
-        let projectWikiTemplateFile = await getSettingValue(Config.SETTINGS.PROJECT_WIKI_TEMPLATE)
-        if(projectWikiTemplateFile.length == 0) {
-            projectWikiTemplateFile = path.join(await getPluginFolder(), "gui", "assets", "new_project_wiki_structure.json")
-        }
+    // Preparing base structure
+    const projectStructure = JSON.parse(
+        projectTemplateString
+            .replace("<PRJ_ICON> ", projectIcon.length > 0 ? projectIcon + " " : projectIcon)
+            .replace("<PRJ_NAME>", projectName)
+    );
 
-        const projectWikiTemplateString = await readFileContent(projectWikiTemplateFile);
-        let projectWikiTemplate = {};
-        if(projectWikiTemplateString.length === 0) {
-            logger.error(`Invalid user defined template path: ${defaultTemplateFile}`)
-            await joplin.views.dialogs.showToast({ message: "Invalid user defined template path", duration: 3000, type: ToastType.Error });
-            return false
+    // Fetching and validating Wiki template
+    const wikiTemplateContent = await getWikiTemplateContent();
+    if (!wikiTemplateContent) return false;
+
+    const wikiTemplate = await parseAndValidateTemplate(wikiTemplateContent);
+    if (!wikiTemplate) return false;
+
+    // Merging templates
+    if (!projectStructure.children) projectStructure.children = [];
+    projectStructure.children.push(wikiTemplate);
+
+    // Creating structure in Joplin
+    const projectParentNotebookId = await getOrInitProjectRootId();
+    
+    // Creating root project folder
+    const projectRootId = (await createNotebook(projectStructure.name, projectParentNotebookId)).id;
+    
+    // Creating children recursively
+    let tasksFolderId: string | null = null;
+    for (const element of projectStructure.children) {
+        if ("content" in element) {
+            await createNote(element.name, element.content.join("\n"), element.is_todo, projectRootId);
         } else {
-            try {
-                projectWikiTemplate = JSON.parse(projectWikiTemplateString)
-                if(!isValidWikiStructure(projectWikiTemplate)) {
-                    await joplin.views.dialogs.showToast({message: "Invalid user defined template json format.\nCheck the console for details.", duration: 3000, type: ToastType.Error });
-                    return false
-                }
-            } catch (e) {
-                logger.error("Invalid user defined template json format!", e);
-                await joplin.views.dialogs.showToast({ message: "Invalid user defined template json format", duration: 3000, type: ToastType.Error });
-                return false
-            }
-        }
-        projectStructure.children.push(projectWikiTemplate);
-
-        // Create the top-level project folder first to get its ID
-        const projectRootId = (await createNotebook(projectStructure.name, projectParentNotebookId)).id;
-
-        // We need to iterate children of the structure now, passing the new root ID
-        let tasksFolderId: string | null = null;
-
-        for (const element of projectStructure.children) {
-             if ("content" in element) {
-                await createNote(element.name, element.content.join("\n"), element.is_todo, projectRootId);
-             } else {
-                const childId = await createProjectNotebooksAndNotes(element, projectRootId);
-                if (childId) tasksFolderId = childId;
-             }
-        }
-
-        if (tasksFolderId) {
-            await saveProjectMeta(projectRootId, tasksFolderId);
-        } else {
-             await saveProjectMeta(projectRootId, projectRootId);
+            const childId = await createProjectNotebooksAndNotes(element, projectRootId);
+            if (childId) tasksFolderId = childId;
         }
     }
-    return true
+
+    // Saving metadata
+    if (tasksFolderId) {
+        await saveProjectMeta(projectRootId, tasksFolderId);
+    } else {
+        await saveProjectMeta(projectRootId, projectRootId);
+    }
+
+    return true;
 }
 
 /**

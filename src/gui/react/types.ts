@@ -38,6 +38,16 @@ export interface DashboardData {
     tasks: Task[];
 }
 
+export interface WikiNode {
+    id: string;
+    title: string;
+    type: 'folder' | 'note';
+    level: number;
+    body: string;
+    is_todo?: boolean;
+    todo_completed?: number;
+}
+
 declare global {
     interface Window {
         webviewApi: {
@@ -46,3 +56,4 @@ declare global {
         };
     }
 }
+

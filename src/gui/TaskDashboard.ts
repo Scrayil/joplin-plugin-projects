@@ -45,12 +45,16 @@ export class TaskDashboard {
         `);
 
         await joplin.views.panels.addScript(this.panelHandle, './gui/react/style.css');
+        await joplin.views.panels.addScript(this.panelHandle, './gui/react/highlight.css');
         await joplin.views.panels.addScript(this.panelHandle, './gui/react/index.js');
 
         await joplin.views.panels.onMessage(this.panelHandle, async (message: any) => {
             try {
                 if (message.name === 'getData') {
                     return await this.projectService.getDashboardData();
+                }
+                if (message.name === 'getWikiData') {
+                    return await this.projectService.getProjectWiki(message.payload.projectId);
                 }
                 if (message.name === 'openEditTaskDialog') {
                     return await this.handleEditTaskDialog(message.payload.task);

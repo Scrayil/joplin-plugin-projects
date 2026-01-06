@@ -282,4 +282,114 @@ export class ProjectService {
         
         return newTasksFolder.id;
     }
+
+    /**
+     * Builds a flattened, hierarchical list of all project content (Wiki/Book View).
+     * Returns an array of items (folders as headers, notes as content) sorted by depth-first search.
+     */
+    public async getProjectWiki(projectId: string) {
+        // 1. Fetch structure
+        const allFolders = await this.fetchAllFolders(['id', 'parent_id', 'title']);
+        let rootFolders: any[] = [];
+        
+        if (projectId === 'all') {
+            const rootId = await getOrInitProjectRootId(false);
+            if (rootId) {
+                rootFolders = allFolders.filter((f: any) => f.parent_id === rootId);
+            }
+        } else {
+            const project = allFolders.find((f: any) => f.id === projectId);
+            if (project) rootFolders = [project];
+        }
+
+        // 2. Map structure
+        const folderMap = new Map<string, any>();
+        
+        // Filter out "Tasks" folders globally before mapping
+        const tasksKeyword = Config.FOLDERS.TASKS;
+        const filteredFolders = allFolders.filter((f: any) => !f.title.includes(tasksKeyword));
+
+        filteredFolders.forEach((f: any) => {
+            folderMap.set(f.id, { ...f, type: 'folder', children: [] });
+        });
+
+        const targetIds = new Set<string>();
+        const collectDescendants = (parentId: string) => {
+            targetIds.add(parentId);
+            const children = filteredFolders.filter((f: any) => f.parent_id === parentId);
+            children.forEach((c: any) => collectDescendants(c.id));
+        };
+        rootFolders.forEach(r => collectDescendants(r.id));
+
+        // 3. Fetch notes metadata first
+        const folderIds = Array.from(targetIds);
+        const notesMeta = await Promise.all(folderIds.map(async (fid) => {
+            return await fetchAllItems(['folders', fid, 'notes'], { fields: ['id', 'parent_id', 'title', 'is_todo'] });
+        }));
+        const allNotes = notesMeta.flat();
+
+        // 4. Attach notes to folders
+        allNotes.forEach((n: any) => {
+            const folderNode = folderMap.get(n.parent_id);
+            if (folderNode) folderNode.children.push({ ...n, type: 'note' });
+        });
+
+        // 5. Connect folders
+        allFolders.forEach((f: any) => {
+            if (targetIds.has(f.id)) {
+                const parent = folderMap.get(f.parent_id);
+                if (parent && targetIds.has(f.parent_id)) {
+                    parent.children.push(folderMap.get(f.id));
+                }
+            }
+        });
+
+        // 6. Sort
+        folderMap.forEach((node) => {
+            node.children.sort((a: any, b: any) => {
+                if (a.type !== b.type) return a.type === 'note' ? -1 : 1;
+                return a.title.localeCompare(b.title);
+            });
+        });
+
+        // 7. Flatten Tree (DFS) to create the "Book" sequence
+        const flatList: any[] = [];
+        const traverse = (node: any, level: number) => {
+            // Add the node itself (Folder as Section Header, Note as Content placeholder)
+            flatList.push({ 
+                id: node.id, 
+                title: node.title, 
+                type: node.type, 
+                level: level,
+                body: '' // Will fetch later
+            });
+
+            if (node.children) {
+                node.children.forEach((child: any) => traverse(child, level + 1));
+            }
+        };
+
+        rootFolders.forEach(r => traverse(folderMap.get(r.id), 0));
+
+        // 8. Fetch bodies ONLY for notes (folders are just headers)
+        // Optimization: Batching
+        const noteItems = flatList.filter(item => item.type === 'note');
+        const batchSize = 20;
+        
+        // Map updates back to flatList via reference or ID map?
+        // Since objects in flatList are references, updating noteItems updates flatList.
+        for (let i = 0; i < noteItems.length; i += batchSize) {
+            const batch = noteItems.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (item) => {
+                try {
+                    const note = await getNote(item.id, ['body']);
+                    item.body = note.body;
+                } catch (e) {
+                    item.body = "_Error loading content_";
+                }
+            }));
+        }
+
+        return flatList;
+    }
 }

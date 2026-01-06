@@ -5,16 +5,18 @@ import KanbanBoard from './components/KanbanBoard';
 import TimelineView from './components/TimelineView';
 import ListView from './components/ListView';
 import InfoView from './components/InfoView';
+import WikiView from './components/WikiView';
 
 /**
  * Main application component for the Task Dashboard.
  * Manages state, data fetching, and tab switching.
  */
 const App: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'kanban' | 'timeline' | 'table' | 'info'>('kanban');
+    const [activeTab, setActiveTab] = useState<'kanban' | 'timeline' | 'table' | 'wiki' | 'info'>('kanban');
     const [data, setData] = useState<DashboardData>({ projects: [], tasks: [] });
     const [loading, setLoading] = useState(true);
     const [projectFilter, setProjectFilter] = useState<string>('all');
+    const [lastUpdated, setLastUpdated] = useState(Date.now());
     const isFetching = React.useRef(false);
 
     /**
@@ -26,6 +28,7 @@ const App: React.FC = () => {
         try {
             const response = await window.webviewApi.postMessage({ name: 'getData' });
             setData(response);
+            setLastUpdated(Date.now());
         } catch (error) {
             console.error('Error fetching data:', error);
         } finally {
@@ -35,36 +38,57 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        /**
-         * Detects Joplin's theme color and applies light/dark mode accordingly.
-         */
         const updateTheme = () => {
             const textColor = getComputedStyle(document.body).getPropertyValue('--joplin-color').trim();
-            let isDark = false;
+            let isDarkTheme = false;
+            
+            let r=0, g=0, b=0;
             if (textColor.startsWith('#')) {
                 const hex = textColor.substring(1);
-                const r = parseInt(hex.substring(0, 2), 16);
-                const g = parseInt(hex.substring(2, 4), 16);
-                const b = parseInt(hex.substring(4, 6), 16);
-                const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-                if (brightness > 128) isDark = true;
+                r = parseInt(hex.substring(0, 2), 16);
+                g = parseInt(hex.substring(2, 4), 16);
+                b = parseInt(hex.substring(4, 6), 16);
+            } else if (textColor.startsWith('rgb')) {
+                const parts = textColor.match(/\d+/g);
+                if (parts && parts.length >= 3) {
+                    r = parseInt(parts[0]);
+                    g = parseInt(parts[1]);
+                    b = parseInt(parts[2]);
+                }
             }
-            document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
-            document.documentElement.style.setProperty('accent-color', 'var(--joplin-selected-color)');
-        };
-        updateTheme();
+            
+            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+            // If text is bright (> 128), it's a Dark Theme.
+            if (brightness > 128) isDarkTheme = true;
 
+            document.documentElement.style.colorScheme = isDarkTheme ? 'dark' : 'light';
+            document.documentElement.style.setProperty('accent-color', 'var(--joplin-selected-color)');
+            
+            if (isDarkTheme) {
+                document.body.classList.add('theme-dark');
+                document.body.classList.remove('theme-light');
+            } else {
+                document.body.classList.add('theme-light');
+                document.body.classList.remove('theme-dark');
+            }
+        };
+
+        updateTheme();
         fetchData();
 
         if (window.webviewApi && window.webviewApi.onMessage) {
             window.webviewApi.onMessage((message: any) => {
                 if (message.name === 'dataChanged') {
                     fetchData();
+                    updateTheme();
                 }
             });
         }
 
-        const interval = setInterval(() => { fetchData(); }, 3000);
+        const interval = setInterval(() => { 
+            fetchData(); 
+            updateTheme();
+        }, 3000);
         return () => clearInterval(interval);
     }, [fetchData]);
 
@@ -228,6 +252,7 @@ const App: React.FC = () => {
                     <button onClick={() => setActiveTab('kanban')} className={activeTab === 'kanban' ? 'active' : ''}>Kanban</button>
                     <button onClick={() => setActiveTab('timeline')} className={activeTab === 'timeline' ? 'active' : ''}>Timeline</button>
                     <button onClick={() => setActiveTab('table')} className={activeTab === 'table' ? 'active' : ''}>List</button>
+                    <button onClick={() => setActiveTab('wiki')} className={activeTab === 'wiki' ? 'active' : ''}>Wiki</button>
                     <button onClick={() => setActiveTab('info')} className={activeTab === 'info' ? 'active' : ''}>Info</button>
                 </div>
             </div>
@@ -250,6 +275,11 @@ const App: React.FC = () => {
                     tasks={displayedTasks} 
                     onOpenNote={handleOpenNote} 
                     onEditTask={handleOpenEditTaskDialog}
+                />}
+                {activeTab === 'wiki' && <WikiView 
+                    projectId={projectFilter}
+                    onOpenNote={handleOpenNote}
+                    lastUpdated={lastUpdated}
                 />}
                 {activeTab === 'info' && <InfoView />}
             </div>

@@ -74,6 +74,7 @@ const InfoView: React.FC = () => {
                     <li style={{ marginBottom: '12px' }}><strong>Kanban:</strong> Visualize your workflow. Drag and drop cards between "To Do", "In Progress", and "Done". Moving a task to "Done" automatically completes all its sub-tasks.</li>
                     <li style={{ marginBottom: '12px' }}><strong>Timeline:</strong> A temporal view of your tasks from creation to deadline. The <span style={{color: '#ff4757', fontWeight: 'bold'}}>red vertical line</span> indicates the current day.</li>
                     <li style={{ marginBottom: '12px' }}><strong>List:</strong> A professional tabular view of all active tasks, sorted by urgency and due date.</li>
+                    <li style={{ marginBottom: '12px' }}><strong>Wiki:</strong> A fully-featured documentation reader with rich Markdown support.</li>
                 </ul>
             </section>
 
@@ -112,12 +113,26 @@ const InfoView: React.FC = () => {
                 </ul>
             </section>
 
+            <section style={{ marginBottom: '30px' }}>
+                <h3 style={{ color: 'var(--text-color)', fontSize: '1.4rem' }}>📖 Wiki Features</h3>
+                <p>The Wiki view transforms your project notes into a browsable documentation site.</p>
+                <ul style={{ paddingLeft: '25px', marginTop: '10px' }}>
+                    <li style={{ marginBottom: '12px' }}><strong>Rich Content:</strong> Supports <strong>GFM Tables</strong>, <strong>Task Lists</strong>, and <strong>Code Snippets</strong> with adaptive syntax highlighting.</li>
+                    <li style={{ marginBottom: '12px' }}><strong>Navigation:</strong> Use the collapsible sidebar to navigate between folders and notes. The layout is responsive.</li>
+                    <li style={{ marginBottom: '12px' }}><strong>Theme Integration:</strong> Automatically adapts to your Joplin theme (Light/Dark), ensuring code blocks and headers always look perfect.</li>
+                </ul>
+            </section>
+
             <section style={{ marginBottom: '30px', borderTop: '1px solid var(--joplin-divider-color)', paddingTop: '20px' }}>
                 <h3 style={{ color: 'var(--text-color)', fontSize: '1.4rem' }}>🛠️ Advanced: Custom Wiki Templates</h3>
                 <p>This feature allows you to enforce a standardized structure for every new project. By defining a <strong>JSON template</strong>, you can automatically generate a hierarchy of notebooks and documentation pages, whenever a project is created.</p>
                 
                 <h4 style={{ marginTop: '15px', color: 'var(--text-color)' }}>Structure Definition</h4>
                 <p>The template defines a tree of nodes. Each node represents either a <strong>Notebook (Folder)</strong> or a <strong>Note</strong>. The system distinguishes them based on the properties you provide.</p>
+
+                <p style={{ marginTop: '10px', fontStyle: 'italic', opacity: 0.9, borderLeft: '3px solid var(--joplin-selected-color)', paddingLeft: '10px' }}>
+                    <strong>Tip:</strong> You can set a <strong>Default Template</strong> in the plugin settings (<em>Tools &gt; Options &gt; Projects</em>) to be applied to all new projects. Alternatively, you can provide a custom JSON template during the creation of a specific project for a one-off structure.
+                </p>
 
                 <ul style={{ paddingLeft: '25px', marginTop: '10px' }}>
                     <li style={{ marginBottom: '8px' }}><strong>Common Property:</strong>

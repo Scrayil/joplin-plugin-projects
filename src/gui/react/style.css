@@ -624,6 +624,28 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     margin-top: 0.3em;
 }
 
+/* TOC Indentation Hints */
+.toc-item {
+    position: relative;
+}
+
+.toc-item::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    /* Limit lines to 8 levels to match padding logic */
+    width: calc(min(var(--level), 8) * 12px);
+    
+    /* Draw a 1px vertical line every 12px */
+    background-image: linear-gradient(to right, transparent 11px, var(--border-color) 1px);
+    background-size: 12px 100%;
+    
+    pointer-events: none;
+    opacity: 0.5;
+}
+
 /* Sidebar Toggle Handle */
 .sidebar-toggle {
     width: 20px;

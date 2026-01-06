@@ -72,6 +72,12 @@ The dashboard is the heart of the plugin and provides several ways to look at yo
   3.  Creation Date (oldest first).
 - **Interactions**: Single-click to open the note, double-click to edit.
 
+#### Wiki View
+- **Integrated Knowledge Base**: Browse and read project documentation directly within the dashboard.
+- **Rich Rendering**: Full support for standard Markdown, including **Tables**, **Task Lists**, and syntax-highlighted **Code Snippets**.
+- **Adaptive Interface**: Features a collapsible Table of Contents sidebar and a responsive reader that adapts to your theme (Light/Dark).
+- **Offline Ready**: All rendering and highlighting libraries are bundled, ensuring full functionality even without an internet connection.
+
 ## Recent changes
 
 - [Changelog](/CHANGELOG.md)

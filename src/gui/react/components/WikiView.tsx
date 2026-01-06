@@ -102,8 +102,9 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated 
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             borderRadius: '4px',
-                            fontWeight: node.type === 'folder' ? 600 : 400
-                        }}
+                            fontWeight: node.type === 'folder' ? 600 : 400,
+                            '--level': node.level,
+                        } as React.CSSProperties}
                         className="toc-item"
                     >
                         {node.type === 'folder' ? '📂 ' : '• '} {node.title}

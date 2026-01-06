@@ -1,11 +1,11 @@
 import { Config } from '../utils/constants';
-import { getPluginDataFolder, readFileContent } from '../utils/utils';
+import { getPluginDataFolder, readFileContent, writeFileContent, getPluginFolder } from '../utils/utils';
 import { TagService } from './TagService';
 import { NoteParser } from './NoteParser';
 import * as path from 'path';
 import * as fs from 'fs';
 import { getOrInitProjectRootId } from '../utils/projects';
-import { fetchAllItems, getNote } from '../utils/database';
+import { fetchAllItems, getNote, createNotebook, getFolder } from '../utils/database';
 
 /**
  * Service responsible for aggregating project data, scanning folders, and maintaining the dashboard state.
@@ -203,24 +203,83 @@ export class ProjectService {
     }
     
     /**
+     * Persists the project metadata to the plugin data folder.
+     */
+    private async saveProjectMeta(projectId: string, tasksFolderId: string) {
+        try {
+            const dataFolder = await getPluginDataFolder();
+            const metaPath = path.join(dataFolder, "project_meta.json");
+            
+            // Update local state first
+            this.projectMeta[projectId] = tasksFolderId;
+            
+            // Persist to file
+            await writeFileContent(metaPath, JSON.stringify(this.projectMeta, null, 2));
+        } catch (error) {
+            console.error("ProjectService: Error saving project meta", error);
+        }
+    }
+
+    /**
+     * Reads the base project template to determine the default name for the Tasks folder.
+     * This ensures that recreated folders match the style (emojis) of the original template.
+     */
+    private async getDefaultTasksFolderName(): Promise<string> {
+        try {
+            const pluginFolder = await getPluginFolder();
+            const templatePath = path.join(pluginFolder, "gui", "assets", "base_project_template.json");
+            const content = await readFileContent(templatePath);
+            if (content) {
+                const template = JSON.parse(content);
+                const taskNode = template.children?.find((c: any) => c.name.includes(Config.FOLDERS.TASKS));
+                if (taskNode) return taskNode.name;
+            }
+        } catch (e) {
+            console.error("ProjectService: Error reading base template", e);
+        }
+        return "🗓️ " + Config.FOLDERS.TASKS; 
+    }
+
+    /**
      * Resolves the ID of the specific "Tasks" folder for a given project.
-     * Uses the metadata cache for lookup, falling back to name-based discovery if necessary.
+     * Uses the metadata cache for lookup, checks for existence, and recreates the folder if it was deleted.
      */
     public async getTasksFolderForProject(projectId: string): Promise<string> {
         await this.loadProjectMeta();
         
-        if (this.projectMeta[projectId]) {
-            return this.projectMeta[projectId];
+        let tasksFolderId = this.projectMeta[projectId];
+
+        // Verifying if the cached folder ID still exists and is not in trash
+        if (tasksFolderId) {
+            try {
+                const folder = await getFolder(tasksFolderId, ['id', 'deleted_time']);
+                if (folder && !folder.deleted_time) {
+                    return tasksFolderId;
+                }
+                // The folder is invalid/deleted. It must be recreated.
+                console.warn(`ProjectService: Tasks folder ${tasksFolderId} for project ${projectId} is missing/deleted. Recovering...`);
+            } catch (e) {
+                console.warn(`ProjectService: cached tasks folder ${tasksFolderId} not found.`);
+            }
         }
 
+        // Scanning children to see if a "Tasks" folder exists (but was not linked)
         const allFolders = await this.fetchAllFolders();
         const projectFolders = allFolders.filter((f: any) => f.parent_id === projectId);
-        const tasksFolder = projectFolders.find((f: any) => f.title.includes(Config.FOLDERS.TASKS));
+        const existingTasksFolder = projectFolders.find((f: any) => f.title.includes(Config.FOLDERS.TASKS));
         
-        if (tasksFolder) {
-            return tasksFolder.id;
-        } else {
-            return projectId; 
+        if (existingTasksFolder) {
+            // Found existing folder, relinking it
+            await this.saveProjectMeta(projectId, existingTasksFolder.id);
+            return existingTasksFolder.id;
         }
+
+        // Last Resort: Creating a new "Tasks" folder
+        console.info(`ProjectService: Creating new Tasks folder for project ${projectId}`);
+        const folderName = await this.getDefaultTasksFolderName();
+        const newTasksFolder = await createNotebook(folderName, projectId);
+        await this.saveProjectMeta(projectId, newTasksFolder.id);
+        
+        return newTasksFolder.id;
     }
 }

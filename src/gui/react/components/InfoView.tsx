@@ -1,9 +1,46 @@
 import * as React from 'react';
+import { useEffect, useRef } from 'react';
+import hljs from 'highlight.js';
 
 /**
  * Renders the information/help tab, providing a guide on how to use the dashboard.
  */
 const InfoView: React.FC = () => {
+    const codeRef = useRef<HTMLElement>(null);
+
+    useEffect(() => {
+        if (codeRef.current) {
+            hljs.highlightElement(codeRef.current);
+        }
+    }, []);
+
+    const exampleJson = `{
+    "name": "Project Wiki",
+    "children": [
+        {
+            "name": "Home",
+            "is_todo": false,
+            "content": [
+                "# Project Overview",
+                "This note was auto-generated."
+            ]
+        },
+        {
+            "name": "Planning",
+            "children": [
+                {
+                    "name": "Kickoff Checklist",
+                    "is_todo": true,
+                    "content": [
+                        "- [ ] Define scope",
+                        "- [ ] Assign team"
+                    ]
+                }
+            ]
+        }
+    ]
+}`;
+
     return (
         <div className="info-view-container" style={{ 
             padding: '0px',
@@ -104,72 +141,10 @@ const InfoView: React.FC = () => {
                 </ul>
 
                 <h4 style={{ marginTop: '15px', color: 'var(--text-color)' }}>Template Example</h4>
-                <pre style={{ 
-                    background: 'var(--column-bg)', 
-                    color: 'var(--text-color)',
-                    padding: '15px', 
-                    borderRadius: '6px', 
-                    border: '1px solid var(--border-color)',
-                    overflowX: 'auto',
-                    fontSize: '0.9rem',
-                    fontFamily: 'Consolas, Monaco, "Andale Mono", monospace',
-                    lineHeight: '1.5',
-                    fontWeight: 'bold'
-                }}>
-                    <div>{'{'}</div>
-                    <div style={{ paddingLeft: '20px' }}>
-                        <span style={{color: 'var(--joplin-url-color)'}}>"name"</span>: <span style={{opacity: 0.8}}>"Project Wiki"</span>,
-                    </div>
-                    <div style={{ paddingLeft: '20px' }}>
-                        <span style={{color: 'var(--joplin-url-color)'}}>"children"</span>: [
-                    </div>
-                    <div style={{ paddingLeft: '40px' }}>{'{'}</div>
-                    <div style={{ paddingLeft: '60px' }}>
-                        <span style={{color: 'var(--joplin-url-color)'}}>"name"</span>: <span style={{opacity: 0.8}}>"Home"</span>,
-                    </div>
-                    <div style={{ paddingLeft: '60px' }}>
-                        <span style={{color: 'var(--joplin-url-color)'}}>"is_todo"</span>: <span style={{color: 'var(--joplin-color-warn)'}}>false</span>,
-                    </div>
-                    <div style={{ paddingLeft: '60px' }}>
-                        <span style={{color: 'var(--joplin-url-color)'}}>"content"</span>: [
-                    </div>
-                    <div style={{ paddingLeft: '80px' }}>
-                        <span style={{opacity: 0.8}}>"# Project Overview"</span>,
-                    </div>
-                    <div style={{ paddingLeft: '80px' }}>
-                        <span style={{opacity: 0.8}}>"This note was auto-generated."</span>
-                    </div>
-                    <div style={{ paddingLeft: '60px' }}>]</div>
-                    <div style={{ paddingLeft: '40px' }}>{'},'}</div>
-                    <div style={{ paddingLeft: '40px' }}>{'{'}</div>
-                    <div style={{ paddingLeft: '60px' }}>
-                        <span style={{color: 'var(--joplin-url-color)'}}>"name"</span>: <span style={{opacity: 0.8}}>"Planning"</span>,
-                    </div>
-                    <div style={{ paddingLeft: '60px' }}>
-                        <span style={{color: 'var(--joplin-url-color)'}}>"children"</span>: [
-                    </div>
-                    <div style={{ paddingLeft: '80px' }}>{'{'}</div>
-                    <div style={{ paddingLeft: '100px' }}>
-                        <span style={{color: 'var(--joplin-url-color)'}}>"name"</span>: <span style={{opacity: 0.8}}>"Kickoff Checklist"</span>,
-                    </div>
-                    <div style={{ paddingLeft: '100px' }}>
-                        <span style={{color: 'var(--joplin-url-color)'}}>"is_todo"</span>: <span style={{color: 'var(--joplin-color-warn)'}}>true</span>,
-                    </div>
-                    <div style={{ paddingLeft: '100px' }}>
-                        <span style={{color: 'var(--joplin-url-color)'}}>"content"</span>: [
-                    </div>
-                    <div style={{ paddingLeft: '120px' }}>
-                        <span style={{opacity: 0.8}} >"- [ ] Define scope"</span>,
-                    </div>
-                    <div style={{ paddingLeft: '120px' }}>
-                        <span style={{opacity: 0.8}}>"- [ ] Assign team"</span>
-                    </div>
-                    <div style={{ paddingLeft: '100px' }}>]</div>
-                    <div style={{ paddingLeft: '80px' }}>{'}'}</div>
-                    <div style={{ paddingLeft: '60px' }}>]</div>
-                    <div style={{ paddingLeft: '40px' }}>{'}'}</div>
-                    <div style={{ paddingLeft: '20px' }}>]</div>
-                    <div>{'}'}</div>
+                <pre style={{ margin: 0 }}>
+                    <code ref={codeRef} className="language-json">
+                        {exampleJson}
+                    </code>
                 </pre>
             </section>
         </div>

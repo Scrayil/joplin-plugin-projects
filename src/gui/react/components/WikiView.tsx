@@ -44,17 +44,20 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated 
         return () => { mounted = false; };
     }, [projectId, lastUpdated]);
 
-    // Render markdown and apply highlighting after data has rendered
+    /**
+     * Renders markdown content and applies syntax highlighting.
+     * Uses a ref to manipulate the DOM directly for optimal performance with external libraries.
+     */
     useEffect(() => {
         if (!loading && wikiData) {
-            // Re-render markdown for all content blocks
+            // Render markdown for all content blocks
             contentRef.current?.querySelectorAll('.markdown-content').forEach(el => {
                 const markdown = el.getAttribute('data-markdown');
                 if (markdown) {
                     el.innerHTML = mdParser.current.render(markdown);
                 }
             });
-            // Then highlight
+            // Apply syntax highlighting
             contentRef.current?.querySelectorAll('pre code').forEach((block) => {
                 hljs.highlightElement(block as HTMLElement);
             });

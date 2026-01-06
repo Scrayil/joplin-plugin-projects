@@ -56,15 +56,14 @@ export class ProjectService {
     public async getDashboardData() {
         await this.loadProjectMeta();
 
-        // Use the smart resolver. Pass 'false' to avoid auto-creating the folder structure
-        // just by opening the dashboard. It will only return an ID if it exists locally or via Anchor note.
+        // Resolve project root without auto-creation.
         const rootId = await getOrInitProjectRootId(false);
         
         if (!rootId) {
             return { projects: [], tasks: [] };
         }
 
-        const allFolders = await this.fetchAllFolders(['id', 'parent_id', 'title']);
+        const allFolders = await this.fetchAllFolders(['id', 'parent_id', 'title', 'updated_time']);
         
         const projectFolders = allFolders.filter((f: any) => f.parent_id === rootId);
         
@@ -109,8 +108,7 @@ export class ProjectService {
             });
         }
 
-        // Fetch tags for ALL candidate notes to include in the signature.
-        // This ensures that if a tag is added/removed externally, the signature changes.
+        // Include tag data in the signature to detect external tag changes.
         const noteIds = validTodosMetadata.map(n => n.id);
         const tagsMap = await this.tagService.getTagsForNotes(noteIds);
 
@@ -120,14 +118,21 @@ export class ProjectService {
             tagsSignature += `${id}:${tags.sort().join(',')}|`;
         });
 
-        const currentSignature = `${validTodosMetadata.length}-${maxUpdated}-${tagsSignature}`;
+        let maxProjectUpdated = 0;
+        let projectsIdStr = '';
+        projectFolders.forEach((p: any) => {
+            if (p.updated_time > maxProjectUpdated) maxProjectUpdated = p.updated_time;
+            projectsIdStr += p.id;
+        });
+
+        const currentSignature = `${projectFolders.length}-${maxProjectUpdated}-${projectsIdStr}-${validTodosMetadata.length}-${maxUpdated}-${tagsSignature}`;
         
         if (this.dashboardCache && currentSignature === this.lastSignature) {
             return this.dashboardCache;
         }
 
-        // Cache miss or data changed: We already have metadata and tags, just need bodies for parsing subtasks
-        // Optimization: Batch the body fetching to prevent freezing the UI with too many concurrent requests.
+        // On cache miss, fetch full note bodies to parse subtasks.
+        // Batched to minimize UI impact.
         const notesWithBody: any[] = [];
         const batchSize = 20;
         
@@ -198,7 +203,7 @@ export class ProjectService {
      * @param fields The fields to retrieve for each folder. Defaults to id, parent_id, and title.
      * @returns A promise resolving to an array of folder objects.
      */
-    private async fetchAllFolders(fields: string[] = ['id', 'parent_id', 'title']) {
+    private async fetchAllFolders(fields: string[] = ['id', 'parent_id', 'title', 'updated_time']) {
         return await fetchAllItems(['folders'], { fields: fields });
     }
     

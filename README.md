@@ -87,7 +87,9 @@ The dashboard is the heart of the plugin and provides several ways to look at yo
 This plugin allows you to enforce a standardized structure for every new project using customizable JSON templates.  
 Automatically generate a hierarchy of notebooks, folders, and pre-filled notes (like "Kickoff Checklist" or "Project Overview") whenever you create a project.
 
+## 🎞️ Demo Video
 
+[![Watch the demo](https://github.com/user-attachments/assets/fd28ce99-a501-4d46-b945-90af469d1ef8)](https://vimeo.com/1152146539?share=copy&fl=sv&fe=ci)
 
 #### Learn More
 For detailed instructions on how to structure your JSON templates and examples, please refer to the **Info** tab within the plugin's dashboard.

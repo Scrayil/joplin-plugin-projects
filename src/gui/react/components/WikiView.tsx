@@ -126,7 +126,7 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated 
             </div>
 
             {/* Main Content (Reader) */}
-            <div ref={contentRef} style={{ flex: 1, overflowY: 'auto', padding: '40px', scrollBehavior: 'smooth', overflowX: 'hidden', minWidth: '450px' }}>
+            <div ref={contentRef} style={{ flex: 1, overflowY: 'auto', padding: '0 40px', scrollBehavior: 'smooth', overflowX: 'hidden', minWidth: '450px' }}>
                 {wikiData.map(node => (
                     <div id={`wiki-section-${node.id}`} key={node.id} style={{ marginBottom: '40px' }}>
                         {node.type === 'folder' ? (

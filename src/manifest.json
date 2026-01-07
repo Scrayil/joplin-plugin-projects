@@ -14,6 +14,7 @@
 		{ "src": "assets/screenshots/kanban_view.png", "label": "Kanban view to manage all tasks' states" },
 		{ "src": "assets/screenshots/timeline_view.png", "label": "Timeline view showing all active tasks having a due datetime" },
 		{ "src": "assets/screenshots/list_view.png", "label": "List view to easily visualize pending tasks with their data" },
+		{ "src": "assets/screenshots/wiki_view.png", "label": "Wiki reader view showing rendered projects' documentation" },
 		{ "src": "assets/screenshots/edit_task_dialog.png", "label": "Dialog used to edit or delete a specific task" }
 	],
 	"icons": {

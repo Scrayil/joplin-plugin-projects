@@ -31,7 +31,7 @@ export class NoteParser {
         const lines = body.split('\n');
         const escapedTitle = subTaskTitle.replace(/[.*+?^${}()|[\\]/g, '\\$&');
         // Added $ anchor to ensure we match the exact task title and not a prefix
-        const regex = new RegExp(`^(\\s*-\\s*\\[)([ xX])(\\]\\s*${escapedTitle})$`);
+        const regex = new RegExp(`^(\\s*-\\s*\\[)([ xX])(\\]\\s*${escapedTitle})\\s*$`);
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];

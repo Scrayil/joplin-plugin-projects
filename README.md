@@ -13,6 +13,7 @@ An advanced project management plugin for Joplin that transforms your notes into
   - **Kanban Board**: A drag-and-drop interface to move tasks between "To Do", "In Progress", and "Done" columns.
   - **Timeline View**: A chronological, Gantt-style chart that visualizes task durations and deadlines.
   - **List View**: A clean, sortable table of all your tasks, prioritized by due date and urgency.
+  - **Wiki View**: Browse and read project documentation with rich Markdown support.
 - **Interactive Dashboard**: A central hub to visualize and interact with all your tasks from every project.
 - **Smart Task Recognition**: Any to-do note inside a project's dedicated "Tasks" folder is automatically picked up by the dashboard.
 - **Sub-task Management**: Create and toggle sub-tasks (markdown checkboxes) directly from the Kanban board or edit dialog.
@@ -45,7 +46,10 @@ A **Task** is simply a Joplin **to-do note**. For the plugin to recognize a task
 
 #### 3. Open the Dashboard
 
-Click the "Toggle Project Dashboard" icon (looks like columns `fas fa-columns`) in the note toolbar to open the main dashboard view.
+You can open the dashboard in several ways:
+- **Note Toolbar**: Click the folder icon (`fas fa-folder-open`) in the note toolbar.
+- **Menu**: Go to `View` > `Toggle Project Dashboard`.
+- **Shortcut**: Press `Ctrl+Alt+P`.
 
 ### The Dashboard Views
 
@@ -77,6 +81,16 @@ The dashboard is the heart of the plugin and provides several ways to look at yo
 - **Rich Rendering**: Full support for standard Markdown, including **Tables**, **Task Lists**, and syntax-highlighted **Code Snippets**.
 - **Adaptive Interface**: Features a collapsible Table of Contents sidebar and a responsive reader that adapts to your theme (Light/Dark).
 - **Offline Ready**: All rendering and highlighting libraries are bundled, ensuring full functionality even without an internet connection.
+
+### Custom Wiki Templates
+
+This plugin allows you to enforce a standardized structure for every new project using customizable JSON templates.  
+Automatically generate a hierarchy of notebooks, folders, and pre-filled notes (like "Kickoff Checklist" or "Project Overview") whenever you create a project.
+
+
+
+#### Learn More
+For detailed instructions on how to structure your JSON templates and examples, please refer to the **Info** tab within the plugin's dashboard.
 
 ## Recent changes
 

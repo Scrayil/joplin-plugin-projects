@@ -145,3 +145,27 @@ export async function addTagToNote(tagId: string, noteId: string) {
 export async function removeTagFromNote(tagId: string, noteId: string) {
     return await joplin.data.delete(['tags', tagId, 'notes', noteId]);
 }
+
+/**
+ * Retrieves the local file system path for a given resource.
+ * @param id The unique identifier of the resource.
+ * @returns The absolute path to the resource file, or null if retrieval fails.
+ */
+export async function getResourcePath(id: string): Promise<string | null> {
+    try {
+        return await joplin.data.resourcePath(id);
+    } catch (error) {
+        console.error("Error retrieving resource path:", error);
+        return null;
+    }
+}
+
+/**
+ * Retrieves metadata for a specific resource.
+ * @param id The unique identifier of the resource.
+ * @param fields Array of fields to retrieve (defaults to mime and file_extension).
+ * @returns The resource metadata object.
+ */
+export async function getResource(id: string, fields: string[] = ['mime', 'file_extension']) {
+    return await joplin.data.get(['resources', id], { fields });
+}

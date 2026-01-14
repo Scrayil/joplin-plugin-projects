@@ -609,6 +609,14 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     background-color: rgba(127,127,127, 0.05);
 }
 
+/* Ensure images don't overflow */
+.markdown-body img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 10px 0;
+}
+
 /* Markdown Task Lists */
 .contains-task-list {
     list-style-type: none;

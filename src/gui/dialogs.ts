@@ -43,7 +43,6 @@ export async function newProjectDialog() {
             await joplin.views.dialogs.showToast({message: "Project name required", duration: 3000, type: ToastType.Error})
         } else {
             logger.info(`Creating project: ${projectIcon} ${projectName}`);
-            // Pass content as 3rd arg
             if(await createProject(projectName, projectIcon, projectTemplateContent)) {
                 await joplin.views.dialogs.showToast({message: "Project created successfully", duration: 3000, type: ToastType.Success})
             } else {
@@ -176,7 +175,7 @@ export async function editTaskDialog(task: any) {
 
     // Subtasks are handled by the script which reads the hidden input value
     const subTasksStr = task.subTasks.map((st: any) => st.title).join('\n');
-    // Using a safer way to inject value into the hidden field
+    // Inject subtasks into hidden field, ensuring quotes are escaped
     html = html.replace('id="taskSubTasks" name="taskSubTasks" value=""', `id="taskSubTasks" name="taskSubTasks" value="${subTasksStr.replace(/"/g, '&quot;')}"`);
 
     await joplin.views.dialogs.setHtml(dialog, html);

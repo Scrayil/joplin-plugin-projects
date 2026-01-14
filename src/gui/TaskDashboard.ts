@@ -65,6 +65,9 @@ export class TaskDashboard {
                 if (message.name === 'createTask') {
                     return await this.createTask(message.payload);
                 }
+                if (message.name === 'openItem') {
+                    return await joplin.commands.execute('openItem', message.payload);
+                }
                 if (message.name === 'updateTaskStatus') {
                     return await this.updateTaskStatus(message.payload);
                 }
@@ -235,7 +238,7 @@ export class TaskDashboard {
      */
     private async updateTask(taskId: string, payload: { subTasks: string[]; urgency: string; dueDate: number }) {
         try {
-            // Fetch current note body to preserve non-checklist content
+            // Retrieve existing body to merge updates without data loss
             const currentNote = await getNote(taskId, ['body']);
             const body = this.noteParser.updateNoteBodyWithSubTasks(currentNote.body, payload.subTasks);
             

@@ -5,7 +5,7 @@ import { NoteParser } from './NoteParser';
 import * as path from 'path';
 import * as fs from 'fs';
 import { getOrInitProjectRootId } from '../utils/projects';
-import { fetchAllItems, getNote, createNotebook, getFolder } from '../utils/database';
+import { fetchAllItems, getNote, createNotebook, getFolder, getResourcePath, getResource } from '../utils/database';
 
 /**
  * Service responsible for aggregating project data, scanning folders, and maintaining the dashboard state.
@@ -179,7 +179,7 @@ export class ProjectService {
             projects: projectFolders.map((p: any) => ({ id: p.id, name: p.title })),
             tasks: dashboardTasks,
             config: {
-                pollingInterval: 3000 // Hardcoded as per request "Remove the only remaining setting"
+                pollingInterval: 3000
             }
         };
         
@@ -293,7 +293,7 @@ export class ProjectService {
      * Returns an array of items (folders as headers, notes as content) sorted by depth-first search.
      */
     public async getProjectWiki(projectId: string) {
-        // 1. Fetch structure
+        // Fetch structure
         const allFolders = await this.fetchAllFolders(['id', 'parent_id', 'title']);
         let rootFolders: any[] = [];
         
@@ -307,7 +307,7 @@ export class ProjectService {
             if (project) rootFolders = [project];
         }
 
-        // 2. Map structure
+        // Map structure
         const folderMap = new Map<string, any>();
         
         // Filter out "Tasks" folders globally before mapping
@@ -326,20 +326,20 @@ export class ProjectService {
         };
         rootFolders.forEach(r => collectDescendants(r.id));
 
-        // 3. Fetch notes metadata first
+        // Fetch notes metadata first
         const folderIds = Array.from(targetIds);
         const notesMeta = await Promise.all(folderIds.map(async (fid) => {
             return await fetchAllItems(['folders', fid, 'notes'], { fields: ['id', 'parent_id', 'title', 'is_todo'] });
         }));
         const allNotes = notesMeta.flat();
 
-        // 4. Attach notes to folders
+        // Attach notes to folders
         allNotes.forEach((n: any) => {
             const folderNode = folderMap.get(n.parent_id);
             if (folderNode) folderNode.children.push({ ...n, type: 'note' });
         });
 
-        // 5. Connect folders
+        // Connect folders
         allFolders.forEach((f: any) => {
             if (targetIds.has(f.id)) {
                 const parent = folderMap.get(f.parent_id);
@@ -349,7 +349,7 @@ export class ProjectService {
             }
         });
 
-        // 6. Sort
+        // Sort
         folderMap.forEach((node) => {
             node.children.sort((a: any, b: any) => {
                 if (a.type !== b.type) return a.type === 'note' ? -1 : 1;
@@ -357,7 +357,7 @@ export class ProjectService {
             });
         });
 
-        // 7. Flatten Tree (DFS) to create the "Book" sequence
+        // Flatten Tree (DFS) to create the "Book" sequence
         const flatList: any[] = [];
         const traverse = (node: any, level: number) => {
             // Add the node itself (Folder as Section Header, Note as Content placeholder)
@@ -376,8 +376,8 @@ export class ProjectService {
 
         rootFolders.forEach(r => traverse(folderMap.get(r.id), 0));
 
-        // 8. Fetch bodies ONLY for notes (folders are just headers)
-        // Optimization: Batching
+        // Fetch bodies ONLY for notes (folders are just headers)
+        // Batched processing
         const noteItems = flatList.filter(item => item.type === 'note');
         const batchSize = 20;
         
@@ -388,7 +388,60 @@ export class ProjectService {
             await Promise.all(batch.map(async (item) => {
                 try {
                     const note = await getNote(item.id, ['body']);
-                    item.body = note.body;
+                    let body = note.body;
+
+                    const linkRegex = /(!?)\[(.*?)\]\(:\/([a-f0-9]{32})\)/g;
+                    const matches: { full: string, id: string }[] = [];
+                    let match;
+                    
+                    while ((match = linkRegex.exec(body)) !== null) {
+                        matches.push({ full: match[0], id: match[3] });
+                    }
+
+                    if (matches.length > 0) {
+                        const uniqueIds = Array.from(new Set(matches.map(m => m.id)));
+                        const resourceMap = new Map<string, { path: string, mime: string }>();
+
+                        await Promise.all(uniqueIds.map(async (id) => {
+                            const path = await getResourcePath(id);
+                            const meta = await getResource(id, ['mime']);
+                            if (path) {
+                                resourceMap.set(id, { path, mime: meta?.mime || '' });
+                            }
+                        }));
+
+                        body = body.replace(linkRegex, (fullMatch, bang, alt, id) => {
+                            const res = resourceMap.get(id);
+                            if (res) {
+                                let normalizedPath = res.path.replace(/\\/g, '/');
+                                
+                                // Ensure the path starts with a forward slash for cross-platform compatibility.
+                                if (!normalizedPath.startsWith('/')) {
+                                    normalizedPath = '/' + normalizedPath;
+                                }
+
+                                // Encode the path to ensure it is a valid URI and safe for markdown usage.
+                                const encodedPath = encodeURI(normalizedPath)
+                                    .replace(/\(/g, '%28')
+                                    .replace(/\)/g, '%29');
+                                
+                                // Append MIME type and ID as hash fragments.
+                                // ID is needed to delegate opening of non-media resources back to Joplin.
+                                const fileUri = `file://${encodedPath}#mime=${res.mime}&id=${id}`;
+
+                                if (res.mime.startsWith('image/')) {
+                                    return `![${alt}](${fileUri})`;
+                                } else {
+                                    // For non-image files, return a standard link.
+                                    // The frontend will parse the hash to decide whether to play (media) or open in Joplin (others).
+                                    return `[${alt}](${fileUri})`;
+                                }
+                            }
+                            return fullMatch;
+                        });
+                    }
+
+                    item.body = body;
                 } catch (e) {
                     item.body = "_Error loading content_";
                 }

@@ -92,6 +92,19 @@ const App: React.FC = () => {
         return () => clearInterval(interval);
     }, [fetchData]);
 
+    /**
+     * Effect to validate the selected project filter against the available projects.
+     * Resets to 'all' if the selected project is deleted or no longer available.
+     */
+    useEffect(() => {
+        if (projectFilter === 'all') return;
+
+        const projectExists = data.projects.some(p => p.id === projectFilter);
+        if (!projectExists) {
+            setProjectFilter('all');
+        }
+    }, [data.projects, projectFilter]);
+
     const handleOpenCreateTaskDialog = async () => {
         try {
             await window.webviewApi.postMessage({ name: 'openCreateTaskDialog' });

@@ -286,14 +286,19 @@ export class TaskDashboard {
         
         const note = await getNote(taskId, ['body', 'todo_completed']);
         const isCompleted = newStatus === 'done';
+        const wasCompleted = !!note.todo_completed; // Check if it was previously completed
         
         const updates: any = {
             todo_completed: isCompleted ? Date.now() : 0 
         };
 
-        const newBody = this.noteParser.updateAllSubTasks(note.body, isCompleted);
-        if (newBody !== note.body) {
-            updates.body = newBody;
+        // Only update subtasks if we are entering 'done' state OR leaving 'done' state.
+        // If moving between 'todo' and 'in_progress', leave subtasks as they are.
+        if (isCompleted || wasCompleted) {
+            const newBody = this.noteParser.updateAllSubTasks(note.body, isCompleted);
+            if (newBody !== note.body) {
+                updates.body = newBody;
+            }
         }
 
         await updateNote(taskId, updates);

@@ -170,7 +170,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
                                                 style={{ ...provided.draggableProps.style, cursor: 'pointer' }}
                                                 onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
                                                 onContextMenu={(e) => handleContextMenu(e, task)}
-                                                title={`${task.title}\n${task.dueDate > 0 ? `Due: ${formatDate(task.dueDate)}` : ''}`}
+                                                title={`${task.projectName}\n${task.title}${task.dueDate > 0 ? `\n${formatDate(task.dueDate)}` : ''}`}
                                             >
                                                 <div className="task-title">
                                                     <span className="task-project-tag">[{task.projectName}]</span>

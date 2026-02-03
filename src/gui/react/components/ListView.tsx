@@ -125,6 +125,7 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
                                 onContextMenu={(e) => handleContextMenu(e, task)}
                                 className={`list-row ${isOverdue ? 'overdue' : ''}`} 
                                 style={{ borderBottom: '1px solid var(--joplin-divider-color)', transition: 'background 0.2s', cursor: 'pointer' }}
+                                title={`${task.projectName}\n${task.title}${task.dueDate > 0 ? `\n${formatDate(task.dueDate)}` : ''}`}
                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isOverdue ? 'rgba(255, 0, 0, 0.1)' : 'var(--joplin-background-color-hover3)'}
                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isOverdue ? 'rgba(255, 0, 0, 0.05)' : 'transparent'}
                             >

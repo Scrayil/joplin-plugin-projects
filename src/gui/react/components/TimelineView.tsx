@@ -120,7 +120,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                             <div key={task.id} className={`timeline-row ${isOverdue ? 'overdue' : ''}`} style={{ height: '60px', position: 'relative', borderBottom: '1px solid var(--joplin-divider-color)', margin: '0 10px', cursor: 'pointer' }} 
                                  onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
                                  onContextMenu={(e) => handleContextMenu(e, task)}
-                                 title={`${task.title}\nDue: ${formatDate(task.dueDate!)}`}>
+                                 title={`${task.projectName}\n${task.title}${task.dueDate! > 0 ? `\n${formatDate(task.dueDate!)}` : ''}`}>
                                 <div style={{ position: 'absolute', left: `${startPos}%`, top: '5px', fontSize: '0.9rem', color: 'var(--joplin-color)', whiteSpace: 'nowrap', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: projectColor, display: 'inline-block', flexShrink: 0 }}></span>
                                     <span style={{ color: 'orange' }}>[{task.projectName}]</span> {task.title}

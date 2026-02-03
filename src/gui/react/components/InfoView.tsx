@@ -3,7 +3,11 @@ import { useEffect, useRef } from 'react';
 import hljs from 'highlight.js';
 
 /**
- * Renders the information/help tab, providing a guide on how to use the dashboard.
+ * Renders the "Info" tab, serving as a user guide for the dashboard.
+ * 
+ * Displays static documentation about plugin features, shortcuts, and the 
+ * JSON structure required for custom project templates. Includes syntax 
+ * highlighting for the JSON example.
  */
 const InfoView: React.FC = () => {
     const codeRef = useRef<HTMLElement>(null);

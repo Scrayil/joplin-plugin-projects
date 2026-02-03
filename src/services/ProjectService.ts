@@ -289,8 +289,17 @@ export class ProjectService {
     }
 
     /**
-     * Builds a flattened, hierarchical list of all project content (Wiki/Book View).
-     * Returns an array of items (folders as headers, notes as content) sorted by depth-first search.
+     * Builds a flattened, hierarchical list of all project content for the Wiki view.
+     * 
+     * The method converts the nested folder/note structure into a flat array ordered
+     * by Depth-First Search (DFS). This linear sequence allows the frontend to render
+     * the content like a continuous book or document.
+     * 
+     * It also performs a second pass to resolve local resource links (images/files)
+     * within note bodies, rewriting them to valid `file://` URIs for the WebView.
+     * 
+     * @param projectId The ID of the root project folder, or 'all' for everything.
+     * @returns A promise resolving to the ordered list of WikiNodes.
      */
     public async getProjectWiki(projectId: string) {
         // Fetch structure

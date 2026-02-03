@@ -13,17 +13,17 @@ const logger = Logger.create('Projects: Index');
 joplin.plugins.register({
 	/**
 	 * Plugin entry point.
-	 * Initializes the Task Dashboard and registers commands.
+	 * 
+	 * Initializes the Task Dashboard singleton, registers the main commands, and
+	 * sets up the settings panel. This method acts as the composition root for the
+	 * plugin's lifecycle.
 	 */
 	onStart: async function() {
-		// Registering the plugin's settings section
 		await registerSettings()
 
-		// Initialize the Dashboard View
 		await TaskDashboard.getInstance().register();
 
-		// Registering commands.ts and related menu options
-		await  registerJoplinCommands()
+		await registerJoplinCommands()
 
 		logger.info('Plugin started!');
 	},

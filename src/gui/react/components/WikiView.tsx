@@ -6,11 +6,24 @@ import hljs from 'highlight.js';
 import taskLists from 'markdown-it-task-lists';
 
 interface WikiViewProps {
+    /** The ID of the project folder to render documentation for. */
     projectId: string;
+    /** Callback to open a specific note in the main Joplin editor. */
     onOpenNote: (noteId: string) => void;
+    /** Timestamp used to trigger re-renders when underlying data changes. */
     lastUpdated: number;
 }
 
+/**
+ * Renders the project documentation (Wiki) view.
+ * 
+ * This component fetches the hierarchical project structure and renders it as a 
+ * single-page "book" view. It handles Markdown rendering, syntax highlighting, 
+ * and provides a table of contents for navigation.
+ * 
+ * It also implements custom handling for local file resources (video/audio) 
+ * to allow playback within the plugin panel, bypassing standard link behavior.
+ */
 const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated }) => {
     const [wikiData, setWikiData] = useState<WikiNode[]>([]);
     const [loading, setLoading] = useState(true);
@@ -98,6 +111,15 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated 
         }
     };
 
+    /**
+     * Intercepts clicks on links to handle local media resources specifically.
+     * 
+     * Standard links are handled by the WebView default behavior, but local `file://` 
+     * links pointing to audio or video are intercepted to open the in-app media player overlay.
+     * This provides a seamless preview experience without leaving the dashboard.
+     * 
+     * @param e The mouse event triggered by the click.
+     */
     const handleContentClick = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
         if (target.tagName === 'A') {

@@ -79,9 +79,11 @@ export async function searchNotes(query: string, fields: string[] = ['id', 'titl
 
 /**
  * Generic helper to fetch all items from a paginated Joplin API endpoint.
- * @param path The API path segments.
- * @param query Optional query parameters.
- * @returns An array of all items.
+ * Automatically handles pagination by following the `has_more` flag.
+ * 
+ * @param path The API path segments (e.g., ["notes"]).
+ * @param query Optional query parameters to filter results.
+ * @returns A promise resolving to an array of items. The shape of items depends on the endpoint.
  */
 export async function fetchAllItems(path: string[], query: any = null) {
     let page = 1;

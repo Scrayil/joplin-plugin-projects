@@ -137,6 +137,7 @@ export async function editTaskDialog(task: any) {
     await joplin.views.dialogs.setButtons(dialog, [
         {id: "cancel", title: "Cancel"}, 
         {id: "delete", title: "Delete Task"},
+        {id: "text_edit", title: "Text Edit"},
         {id: "save", title: "Save Changes"}
     ]);
 
@@ -191,6 +192,9 @@ export async function editTaskDialog(task: any) {
     }
     if (result.id === "delete") {
         return { action: 'delete' };
+    }
+    if (result.id === "text_edit") {
+        return { action: 'text_edit' };
     }
     return null;
 }

@@ -85,8 +85,8 @@ const InfoView: React.FC = () => {
             <section style={{ marginBottom: '30px' }}>
                 <h3 style={{ color: 'var(--text-color)', fontSize: '1.4rem' }}>🖱️ Interactions</h3>
                 <ul style={{ paddingLeft: '25px' }}>
-                    <li style={{ marginBottom: '12px' }}><strong>Single Click:</strong> Instantly opens the corresponding note in the Joplin editor.</li>
                     <li style={{ marginBottom: '12px' }}><strong>Double Click:</strong> Opens the <strong>Edit Task</strong> dialog to modify deadlines, priority, or sub-tasks.</li>
+                    <li style={{ marginBottom: '12px' }}><strong>Right Click:</strong> Opens a <strong>Context Menu</strong> with options to Edit (GUI), Edit Text (Note), or Delete the task.</li>
                     <li style={{ marginBottom: '12px' }}><strong>(+) Button:</strong> Opens the <strong>New Task</strong> dialog. You can also create new projects directly from there.</li>
                     <li style={{ marginBottom: '12px' }}><strong>Project Filter:</strong> Use the dropdown in the header to focus on a specific project or view "All Tasks".</li>
                 </ul>

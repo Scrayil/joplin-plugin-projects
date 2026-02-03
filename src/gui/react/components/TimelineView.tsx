@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Task } from '../types';
 import {formatDate} from "../utils";
+import TaskContextMenu from './TaskContextMenu';
 
 interface TimelineViewProps {
     tasks: Task[];
@@ -12,6 +13,8 @@ interface TimelineViewProps {
  * Renders a Gantt-like timeline view of tasks based on their creation and due dates.
  */
 const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTask }) => {
+    const [contextMenu, setContextMenu] = React.useState<{x: number, y: number, task: Task} | null>(null);
+
     const getPriorityValue = (tags: string[]) => {
         if (tags.some(t => t.toLowerCase().includes('high'))) return 1;
         if (tags.some(t => t.toLowerCase().includes('normal') || t.toLowerCase().includes('medium'))) return 2;
@@ -41,6 +44,15 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
             </div>
         );
     }
+
+    const handleDeleteTask = (task: Task) => {
+        window.webviewApi.postMessage({ name: 'deleteTask', payload: { task } });
+    };
+
+    const handleContextMenu = (e: React.MouseEvent, task: Task) => {
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY, task });
+    };
 
     const getProjectColor = (projectId: string) => {
         let hash = 0;
@@ -106,8 +118,8 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
 
                         return (
                             <div key={task.id} className={`timeline-row ${isOverdue ? 'overdue' : ''}`} style={{ height: '60px', position: 'relative', borderBottom: '1px solid var(--joplin-divider-color)', margin: '0 10px', cursor: 'pointer' }} 
-                                 onClick={() => onOpenNote(task.id)}
                                  onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
+                                 onContextMenu={(e) => handleContextMenu(e, task)}
                                  title={`${task.title}\nDue: ${formatDate(task.dueDate!)}`}>
                                 <div style={{ position: 'absolute', left: `${startPos}%`, top: '5px', fontSize: '0.9rem', color: 'var(--joplin-color)', whiteSpace: 'nowrap', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: projectColor, display: 'inline-block', flexShrink: 0 }}></span>
@@ -148,6 +160,16 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                     })}
                 </div>
             </div>
+            {contextMenu && (
+                <TaskContextMenu 
+                    x={contextMenu.x} 
+                    y={contextMenu.y} 
+                    onClose={() => setContextMenu(null)}
+                    onGuiEdit={() => onEditTask(contextMenu.task)}
+                    onTextEdit={() => onOpenNote(contextMenu.task.id)}
+                    onDelete={() => handleDeleteTask(contextMenu.task)}
+                />
+            )}
         </div>
     );
 };

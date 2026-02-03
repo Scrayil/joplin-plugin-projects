@@ -4,10 +4,10 @@ import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautif
 import {formatDate} from "../utils";
 import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
+import TaskContextMenu from './TaskContextMenu';
 
 interface KanbanBoardProps {
     tasks: Task[];
-    projects: Project[];
     onUpdateStatus: (taskId: string, newStatus: string) => void;
     onToggleSubTask: (taskId: string, subTaskTitle: string, checked: boolean) => void;
     onOpenNote: (taskId: string) => void;
@@ -18,8 +18,10 @@ interface KanbanBoardProps {
  * Renders tasks in a Kanban-style board with draggable cards.
  * Columns: To Do, In Progress, Done.
  */
-const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStatus, onToggleSubTask, onOpenNote, onEditTask }) => {
+const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onToggleSubTask, onOpenNote, onEditTask }) => {
     
+    const [contextMenu, setContextMenu] = React.useState<{x: number, y: number, task: Task} | null>(null);
+
     // Memoize parser to avoid re-creation on every render
     const mdParser = React.useMemo(() => new MarkdownIt({
         html: false, // Security: Disable HTML input, only allow Markdown syntax
@@ -60,6 +62,15 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStat
         if (!destination) return;
         if (destination.droppableId === source.droppableId && destination.index === source.index) return;
         onUpdateStatus(draggableId, destination.droppableId);
+    };
+
+    const handleDeleteTask = (task: Task) => {
+        window.webviewApi.postMessage({ name: 'deleteTask', payload: { task } });
+    };
+
+    const handleContextMenu = (e: React.MouseEvent, task: Task) => {
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY, task });
     };
 
     const renderTags = (tags: string[]) => {
@@ -157,8 +168,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStat
                                                 {...provided.draggableProps}
                                                 {...provided.dragHandleProps}
                                                 style={{ ...provided.draggableProps.style, cursor: 'pointer' }}
-                                                onClick={() => onOpenNote(task.id)}
                                                 onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
+                                                onContextMenu={(e) => handleContextMenu(e, task)}
                                                 title={`${task.title}\n${task.dueDate > 0 ? `Due: ${formatDate(task.dueDate)}` : ''}`}
                                             >
                                                 <div className="task-title">
@@ -187,6 +198,17 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStat
                 {renderColumn('todo', '⚪ To Do')}
                 {renderColumn('in_progress', '🟡 In Progress')}
                 {renderColumn('done', '🟢 Done')}
+                
+                {contextMenu && (
+                    <TaskContextMenu 
+                        x={contextMenu.x} 
+                        y={contextMenu.y} 
+                        onClose={() => setContextMenu(null)}
+                        onGuiEdit={() => onEditTask(contextMenu.task)}
+                        onTextEdit={() => onOpenNote(contextMenu.task.id)}
+                        onDelete={() => handleDeleteTask(contextMenu.task)}
+                    />
+                )}
             </div>
         </DragDropContext>
     );

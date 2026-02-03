@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Task } from '../types';
-import {formatDate} from "../utils";
+import { formatDate } from '../utils';
+import TaskContextMenu from './TaskContextMenu';
 
 interface ListViewProps {
     tasks: Task[];
@@ -12,6 +13,8 @@ interface ListViewProps {
  * Renders a sortable table view of active tasks.
  */
 const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) => {
+    const [contextMenu, setContextMenu] = React.useState<{x: number, y: number, task: Task} | null>(null);
+
     const getPriorityValue = (tags: string[]) => {
         if (tags.some(t => t.toLowerCase().includes('high'))) return 1;
         if (tags.some(t => t.toLowerCase().includes('normal') || t.toLowerCase().includes('medium'))) return 2;
@@ -77,6 +80,15 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
         );
     };
 
+    const handleDeleteTask = (task: Task) => {
+        window.webviewApi.postMessage({ name: 'deleteTask', payload: { task } });
+    };
+
+    const handleContextMenu = (e: React.MouseEvent, task: Task) => {
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY, task });
+    };
+
     return (
         <div className="list-view-container" style={{ padding: '10px', height: '100%', overflowY: 'auto' }}>
             <table style={{ 
@@ -107,13 +119,15 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
                         activeTasks.map(task => {
                             const isOverdue = task.dueDate > 0 && task.dueDate < Date.now() && task.status !== 'done';
                             return (
-                                <tr key={task.id} 
-                                    className={`list-row ${isOverdue ? 'overdue' : ''}`} 
-                                    style={{ borderBottom: '1px solid var(--joplin-divider-color)', transition: 'background 0.2s', cursor: 'pointer' }}
-                                    onClick={() => onOpenNote(task.id)}
-                                    onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
-                                    title={`${task.title}\n${task.dueDate > 0 ? `Due: ${formatDate(task.dueDate)}` : ''}`}
-                                >
+                            <tr 
+                                key={task.id} 
+                                onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
+                                onContextMenu={(e) => handleContextMenu(e, task)}
+                                className={`list-row ${isOverdue ? 'overdue' : ''}`} 
+                                style={{ borderBottom: '1px solid var(--joplin-divider-color)', transition: 'background 0.2s', cursor: 'pointer' }}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isOverdue ? 'rgba(255, 0, 0, 0.1)' : 'var(--joplin-background-color-hover3)'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isOverdue ? 'rgba(255, 0, 0, 0.05)' : 'transparent'}
+                            >
                                     <td style={{ 
                                         padding: '12px 10px', 
                                         borderRight: '1px solid var(--joplin-divider-color)',
@@ -161,6 +175,16 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
                     background-color: var(--joplin-background-color-hover3);
                 }
             `}</style>
+            {contextMenu && (
+                <TaskContextMenu 
+                    x={contextMenu.x} 
+                    y={contextMenu.y} 
+                    onClose={() => setContextMenu(null)}
+                    onGuiEdit={() => onEditTask(contextMenu.task)}
+                    onTextEdit={() => onOpenNote(contextMenu.task.id)}
+                    onDelete={() => handleDeleteTask(contextMenu.task)}
+                />
+            )}
         </div>
     );
 };

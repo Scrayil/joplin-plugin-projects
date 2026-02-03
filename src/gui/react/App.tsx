@@ -18,6 +18,7 @@ const App: React.FC = () => {
     const [projectFilter, setProjectFilter] = useState<string>('all');
     const [lastUpdated, setLastUpdated] = useState(Date.now());
     const isFetching = React.useRef(false);
+    const isDialogOpen = React.useRef(false);
 
     /**
      * Fetches fresh dashboard data from the plugin backend.
@@ -106,6 +107,8 @@ const App: React.FC = () => {
     }, [data.projects, projectFilter]);
 
     const handleOpenCreateTaskDialog = async () => {
+        if (isDialogOpen.current) return;
+        isDialogOpen.current = true;
         try {
             await window.webviewApi.postMessage({ 
                 name: 'openCreateTaskDialog',
@@ -114,15 +117,21 @@ const App: React.FC = () => {
             await fetchData();
         } catch (error) {
             console.error("Error opening create task dialog:", error);
+        } finally {
+            isDialogOpen.current = false;
         }
     };
 
     const handleOpenEditTaskDialog = async (task: Task) => {
+        if (isDialogOpen.current) return;
+        isDialogOpen.current = true;
         try {
             await window.webviewApi.postMessage({ name: 'openEditTaskDialog', payload: { task } });
             await fetchData();
         } catch (error) {
             console.error("Error opening edit task dialog:", error);
+        } finally {
+            isDialogOpen.current = false;
         }
     };
 
@@ -276,7 +285,6 @@ const App: React.FC = () => {
             <div className="content">
                 {activeTab === 'kanban' && <KanbanBoard 
                     tasks={displayedTasks} 
-                    projects={data.projects} 
                     onUpdateStatus={handleUpdateStatus}
                     onToggleSubTask={handleToggleSubTask}
                     onOpenNote={handleOpenNote}

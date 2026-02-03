@@ -65,6 +65,9 @@ export class TaskDashboard {
                 if (message.name === 'createTask') {
                     return await this.createTask(message.payload);
                 }
+                if (message.name === 'deleteTask') {
+                    return await this.handleDeleteTaskWithConfirmation(message.payload.task);
+                }
                 if (message.name === 'openItem' || message.name === 'openExternal') {
                     return await joplin.commands.execute('openItem', message.payload);
                 }
@@ -149,14 +152,10 @@ export class TaskDashboard {
 
                     await this.updateTask(task.id, { subTasks, urgency, dueDate });
                 } else if (result.action === 'delete') {
-                    const confirmed = await joplin.views.dialogs.showMessageBox(`Are you sure you want to delete the task "${task.title}"?`);
-                    if (confirmed === 0) {
-                        await deleteNote(task.id);
-                        await joplin.views.dialogs.showToast({ message: "Task deleted successfully", duration: 3000, type: ToastType.Success });
-                    } else {
-                        await joplin.views.dialogs.showToast({ message: "Task deletion canceled", duration: 3000, type: ToastType.Info });
-                        return;
-                    }
+                    await this.handleDeleteTaskWithConfirmation(task);
+                } else if (result.action === 'text_edit') {
+                     await joplin.commands.execute('openNote', task.id);
+                     return;
                 }
                 await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
             } else {
@@ -165,6 +164,17 @@ export class TaskDashboard {
         } catch (error) {
             console.error('TaskDashboard: Error in edit dialog handler:', error);
             await joplin.views.dialogs.showToast({ message: "Error: " + error.message, duration: 3000, type: ToastType.Error });
+        }
+    }
+
+    private async handleDeleteTaskWithConfirmation(task: any) {
+        const confirmed = await joplin.views.dialogs.showMessageBox(`Are you sure you want to delete the task "${task.title}"?`);
+        if (confirmed === 0) {
+            await deleteNote(task.id);
+            await joplin.views.dialogs.showToast({ message: "Task deleted successfully", duration: 3000, type: ToastType.Success });
+            await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
+        } else {
+            await joplin.views.dialogs.showToast({ message: "Task deletion canceled", duration: 3000, type: ToastType.Info });
         }
     }
 

@@ -59,14 +59,14 @@ The dashboard is the heart of the plugin and provides several ways to look at yo
 - **Visualize Workflow**: See all your tasks as cards in "To Do", "In Progress", and "Done" columns.
 - **Update Status**: Simply drag and drop a card from one column to another to update its status. Moving a task to "In Progress" adds an `In Progress` tag. Moving it to "Done" marks the to-do as completed and checks off all its sub-tasks.
 - **Interactions**:
-  - **Single-Click**: Opens the task note in the Joplin editor.
   - **Double-Click**: Opens an edit dialog to change priority, due date, and sub-tasks.
+  - **Right-Click**: Opens a context menu to Edit, Open Note, or Delete.
   - **Check Sub-tasks**: Toggle sub-tasks directly from the card.
 
 #### Timeline View
 - **Visualize Deadlines**: See tasks plotted on a timeline based on their creation date and due date. A red line indicates the current day.
 - **Identify Overlaps**: Quickly see which tasks are running in parallel.
-- **Interactions**: Single-click to open the note, double-click to edit.
+- **Interactions**: Double-click to edit, Right-click for context menu.
 
 #### List View
 - **Get a Quick Overview**: A simple, powerful table showing all your active tasks.
@@ -74,7 +74,7 @@ The dashboard is the heart of the plugin and provides several ways to look at yo
   1.  Due Date (most urgent first).
   2.  Priority (`High` > `Normal` > `Low`).
   3.  Creation Date (oldest first).
-- **Interactions**: Single-click to open the note, double-click to edit.
+- **Interactions**: Double-click to edit, Right-click for context menu.
 
 #### Wiki View
 - **Integrated Knowledge Base**: Browse and read project documentation directly within the dashboard.

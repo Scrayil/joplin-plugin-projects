@@ -57,9 +57,10 @@ export async function newProjectDialog() {
 /**
  * Displays the dialog for creating a new task.
  * Dynamically loads project options and handles task creation or redirection to project creation.
+ * @param defaultProjectId Optional ID of the project to pre-select.
  * @returns The form data object if confirmed, or null if canceled.
  */
-export async function newTaskDialog() {
+export async function newTaskDialog(defaultProjectId?: string) {
     let dialog: string;
     const pluginFolder = await getPluginFolder();
     
@@ -84,7 +85,10 @@ export async function newTaskDialog() {
     
     // Inject projects
     const projects = await getAllProjects();
-    let optionsHtml = projects.map((p: any) => `<option value="${p.id}">${p.name}</option>`).join('');
+    let optionsHtml = projects.map((p: any) => {
+        const selected = (defaultProjectId && p.id === defaultProjectId) ? 'selected' : '';
+        return `<option value="${p.id}" ${selected}>${p.name}</option>`;
+    }).join('');
     
     if (projects.length === 0) {
         optionsHtml = '<option value="">Create a project first...</option>';
@@ -100,8 +104,8 @@ export async function newTaskDialog() {
     
     if (result.id === "add_project") {
         await newProjectDialog();
-        // Re-open task dialog after project creation
-        return await newTaskDialog();
+        // Re-open task dialog after project creation, preserving selection if possible (or default)
+        return await newTaskDialog(defaultProjectId);
     }
 
     if (result.id === "create") {

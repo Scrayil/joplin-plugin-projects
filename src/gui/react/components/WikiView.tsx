@@ -88,7 +88,12 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated 
             contentRef.current?.querySelectorAll('.markdown-content').forEach(el => {
                 const markdown = el.getAttribute('data-markdown');
                 if (markdown) {
-                    el.innerHTML = DOMPurify.sanitize(mdParser.current.render(markdown));
+                    // Allow file:// protocol for local media resources
+                    const cleanHtml = DOMPurify.sanitize(mdParser.current.render(markdown), {
+                        ADD_URI_SAFE_ATTR: ['href', 'src'],
+                        ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp|file):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
+                    });
+                    el.innerHTML = cleanHtml;
                 }
             });
             // Apply syntax highlighting

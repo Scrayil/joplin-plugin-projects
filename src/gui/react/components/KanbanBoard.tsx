@@ -2,6 +2,8 @@ import * as React from 'react';
 import { Task, Project } from '../types';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import {formatDate} from "../utils";
+import MarkdownIt from 'markdown-it';
+import DOMPurify from 'dompurify';
 
 interface KanbanBoardProps {
     tasks: Task[];
@@ -18,6 +20,13 @@ interface KanbanBoardProps {
  */
 const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStatus, onToggleSubTask, onOpenNote, onEditTask }) => {
     
+    // Memoize parser to avoid re-creation on every render
+    const mdParser = React.useMemo(() => new MarkdownIt({
+        html: false, // Security: Disable HTML input, only allow Markdown syntax
+        linkify: true, // Auto-convert URLs to links
+        typographer: true
+    }), []);
+
     /**
      * Filters and sorts tasks for a specific column (status).
      * Sorts by Due Date -> Priority -> Creation Time.
@@ -83,13 +92,32 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, projects, onUpdateStat
                                 e.stopPropagation();
                                 onToggleSubTask(task.id, st.title, e.target.checked);
                             }}
-                            style={{ cursor: 'pointer' }}
+                            style={{ cursor: 'pointer', flexShrink: 0 }}
                         />
-                        <span style={{ 
-                            textDecoration: st.completed ? 'line-through' : 'none', 
-                            color: st.completed ? 'var(--joplin-divider-color)' : 'var(--text-color)',
-                            opacity: st.completed ? 0.6 : 1
-                        }}>{st.title}</span>
+                        <span 
+                            style={{ 
+                                textDecoration: st.completed ? 'line-through' : 'none', 
+                                color: st.completed ? 'var(--joplin-divider-color)' : 'var(--text-color)',
+                                opacity: st.completed ? 0.6 : 1,
+                                overflowWrap: 'anywhere' // Ensure long URLs wrap
+                            }}
+                            onClick={(e) => {
+                                e.stopPropagation(); // Prevent opening the note card
+                                const target = e.target as HTMLElement;
+                                // Intercept link clicks to force external browser
+                                if (target.tagName === 'A') {
+                                    e.preventDefault();
+                                    const href = (target as HTMLAnchorElement).href;
+                                    window.webviewApi.postMessage({ name: 'openExternal', payload: href });
+                                }
+                            }}
+                            dangerouslySetInnerHTML={{ 
+                                __html: DOMPurify.sanitize(mdParser.renderInline(st.title), { 
+                                    ADD_ATTR: ['target'],
+                                    ALLOWED_URI_REGEXP: /^https?:/i // Strictly allow only http and https
+                                }) 
+                            }} 
+                        />
                     </div>
                 ))}
             </div>

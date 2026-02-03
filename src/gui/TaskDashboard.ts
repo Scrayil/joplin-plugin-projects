@@ -60,12 +60,12 @@ export class TaskDashboard {
                     return await this.handleEditTaskDialog(message.payload.task);
                 }
                 if (message.name === 'openCreateTaskDialog') {
-                    return await this.handleCreateTaskDialog();
+                    return await this.handleCreateTaskDialog(message.payload?.projectId);
                 }
                 if (message.name === 'createTask') {
                     return await this.createTask(message.payload);
                 }
-                if (message.name === 'openItem') {
+                if (message.name === 'openItem' || message.name === 'openExternal') {
                     return await joplin.commands.execute('openItem', message.payload);
                 }
                 if (message.name === 'updateTaskStatus') {
@@ -171,14 +171,14 @@ export class TaskDashboard {
     /**
      * Handles the dialog flow for creating a new task, including optional project creation.
      */
-    private async handleCreateTaskDialog() {
+    private async handleCreateTaskDialog(defaultProjectId?: string) {
          const projects = await getAllProjects();
          if (projects.length === 0) {
             await newProjectDialog();
             return;
          }
 
-        const formData = await newTaskDialog();
+        const formData = await newTaskDialog(defaultProjectId);
         if (formData) {
             const title = formData.taskTitle;
             const projectId = formData.taskProject;
@@ -194,7 +194,18 @@ export class TaskDashboard {
             if (dueDate !== undefined && !Number.isFinite(dueDate)) dueDate = undefined;
 
             const subTasksStr = formData.taskSubTasks || "";
-            const subTasks = subTasksStr.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+            // Process subtasks: Trim, Filter empty, and Auto-Linkify
+            const subTasks = subTasksStr.split('\n')
+                .map((s: string) => s.trim())
+                .filter((s: string) => s.length > 0)
+                .map((s: string) => {
+                    // Regex to find http/https URLs not already linked.
+                    // 1. Negative lookbehind (?<!...) to ensure we aren't inside a markdown link ](url) or html attribute ="url"
+                    // 2. Match http/s protocol
+                    // 3. Match domain and path characters, excluding common trailing punctuation like .,;:)
+                    const urlRegex = /(?<!\]\()(?<!=\")(?<!href=\")\b(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
+                    return s.replace(urlRegex, '[$1]($1)');
+                });
 
             await this.createTask({ title, projectId, subTasks, urgency, dueDate });
             await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });

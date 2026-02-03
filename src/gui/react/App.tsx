@@ -107,7 +107,10 @@ const App: React.FC = () => {
 
     const handleOpenCreateTaskDialog = async () => {
         try {
-            await window.webviewApi.postMessage({ name: 'openCreateTaskDialog' });
+            await window.webviewApi.postMessage({ 
+                name: 'openCreateTaskDialog',
+                payload: { projectId: projectFilter === 'all' ? undefined : projectFilter }
+            });
             await fetchData();
         } catch (error) {
             console.error("Error opening create task dialog:", error);

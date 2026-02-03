@@ -4,6 +4,7 @@ import { WikiNode } from '../types';
 import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js';
 import taskLists from 'markdown-it-task-lists';
+import DOMPurify from 'dompurify';
 
 interface WikiViewProps {
     /** The ID of the project folder to render documentation for. */
@@ -87,7 +88,7 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated 
             contentRef.current?.querySelectorAll('.markdown-content').forEach(el => {
                 const markdown = el.getAttribute('data-markdown');
                 if (markdown) {
-                    el.innerHTML = mdParser.current.render(markdown);
+                    el.innerHTML = DOMPurify.sanitize(mdParser.current.render(markdown));
                 }
             });
             // Apply syntax highlighting

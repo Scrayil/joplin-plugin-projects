@@ -99,10 +99,18 @@
             const isEmpty = i >= subTasks.length;
             const li = document.createElement('li');
             li.className = 'subtask-item' + (isEmpty ? ' empty' : '');
-            li.innerHTML = `
-                <span>${isEmpty ? '-' : task}</span>
-                <button type="button" class="btn-remove" data-index="${i}">×</button>
-            `;
+            
+            const span = document.createElement('span');
+            span.textContent = isEmpty ? '-' : task;
+            li.appendChild(span);
+
+            const btnRemove = document.createElement('button');
+            btnRemove.type = 'button';
+            btnRemove.className = 'btn-remove';
+            btnRemove.setAttribute('data-index', i);
+            btnRemove.textContent = '×';
+            li.appendChild(btnRemove);
+
             list.appendChild(li);
         }
         hiddenInput.value = subTasks.join('\n');

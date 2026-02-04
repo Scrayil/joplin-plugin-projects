@@ -57,6 +57,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
         });
     };
 
+    /**
+     * Handles the end of a drag-and-drop operation for tasks.
+     * Updates the task status if moved to a different column.
+     * @param result The drop result object from react-beautiful-dnd.
+     */
     const onDragEnd = (result: DropResult) => {
         const { destination, source, draggableId } = result;
         if (!destination) return;
@@ -64,15 +69,28 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
         onUpdateStatus(draggableId, destination.droppableId);
     };
 
+    /**
+     * Triggers the deletion process for a task.
+     * @param task The task to delete.
+     */
     const handleDeleteTask = (task: Task) => {
         window.webviewApi.postMessage({ name: 'deleteTask', payload: { task } });
     };
 
+    /**
+     * Opens the custom context menu for a task card.
+     * @param e The mouse event.
+     * @param task The task associated with the context menu.
+     */
     const handleContextMenu = (e: React.MouseEvent, task: Task) => {
         e.preventDefault();
         setContextMenu({ x: e.clientX, y: e.clientY, task });
     };
 
+    /**
+     * Renders visual tags for a task (e.g. Priority).
+     * @param tags Array of tag strings.
+     */
     const renderTags = (tags: string[]) => {
         if (!tags || tags.length === 0) return null;
         return (
@@ -90,6 +108,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
         );
     };
 
+    /**
+     * Renders the list of subtasks for a task card.
+     * Handles nested indentation and checkbox toggling.
+     * @param task The parent task containing subtasks.
+     */
     const renderSubTasks = (task: Task) => {
         if (!task.subTasks || task.subTasks.length === 0) return null;
         return (
@@ -164,6 +187,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
         );
     };
 
+    /**
+     * Renders a single Kanban column with its contained tasks.
+     * @param status The status ID of the column (todo, in_progress, done).
+     * @param title The display title of the column.
+     */
     const renderColumn = (status: string, title: string) => {
         const columnTasks = getTasksByStatus(status);
         let displayedTasks = columnTasks;

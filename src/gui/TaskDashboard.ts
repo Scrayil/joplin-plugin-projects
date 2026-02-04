@@ -170,6 +170,11 @@ export class TaskDashboard {
         }
     }
 
+    /**
+     * Prompts the user for confirmation before deleting a task note.
+     * If confirmed, deletes the note and refreshes the dashboard.
+     * @param task The task object to delete.
+     */
     private async handleDeleteTaskWithConfirmation(task: any) {
         const confirmed = await joplin.views.dialogs.showMessageBox(`Are you sure you want to delete the task "${task.title}"?`);
         if (confirmed === 0) {

@@ -29,6 +29,11 @@
     const btnAddNewProject = document.getElementById('btnAddNewProject');
 
     // -- Helpers --
+    
+    /**
+     * Generates a random UUID-like string for task identification.
+     * @returns {string} A random string.
+     */
     function uuid() {
         return Math.random().toString(36).substr(2, 9);
     }
@@ -47,6 +52,10 @@
 
     // -- Serialization / Deserialization --
 
+    /**
+     * Converts the internal task objects to an indented markdown list string.
+     * Updates the hidden input value used for form submission.
+     */
     function serialize() {
         // Convert objects to indented markdown lines
         // 2 spaces per level
@@ -80,6 +89,11 @@
     }
 
     // -- Internal Button Hack (Existing logic) --
+    
+    /**
+     * Finds the internal "Add Project" button in the dialog footer.
+     * @returns {HTMLButtonElement|null} The found button element or null.
+     */
     function getInternalAddProjectBtn() {
         const buttons = window.parent.document.querySelectorAll('button');
         for (const btn of buttons) {
@@ -110,12 +124,23 @@
 
     // -- Drag & Drop Logic --
 
+    /**
+     * Handles the start of a drag operation.
+     * Sets the dragged item index and applies visual feedback.
+     * @param {DragEvent} e 
+     */
     function handleDragStart(e) {
         draggedIndex = parseInt(e.target.dataset.index);
         e.dataTransfer.effectAllowed = 'move';
+        // Optional: Custom drag image if needed, but default is usually fine
         e.target.style.opacity = '0.5';
     }
 
+    /**
+     * Handles the end of a drag operation.
+     * Resets visual styles and clears the dragged index state.
+     * @param {DragEvent} e 
+     */
     function handleDragEnd(e) {
         e.target.style.opacity = '1';
         draggedIndex = null;
@@ -125,6 +150,12 @@
         });
     }
 
+    /**
+     * Handles the dragover event to calculate drop zones.
+     * Determines if the drop should be above, below, or nested based on mouse position.
+     * Updates visual classes on the target element.
+     * @param {DragEvent} e 
+     */
     function handleDragOver(e) {
         e.preventDefault();
         const target = e.currentTarget;
@@ -156,7 +187,12 @@
         }
     }
 
-    // Helper: Get all descendants of a task (contiguous block with higher level)
+    /**
+     * Calculates the size of a task block (the task plus all its descendants).
+     * Used to move a parent and its children together.
+     * @param {number} startIndex Index of the parent task.
+     * @returns {number} The total count of items in the block.
+     */
     function getBlockSize(startIndex) {
         let size = 1;
         const rootLevel = subTasks[startIndex].level;
@@ -167,6 +203,11 @@
         return size;
     }
 
+    /**
+     * Handles the drop event, executing the move logic.
+     * Updates the data structure, handles nesting rules, and triggers a re-render.
+     * @param {DragEvent} e 
+     */
     function handleDrop(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -248,6 +289,10 @@
 
     // -- Rendering --
 
+    /**
+     * Normalizes the hierarchy levels to ensure validity.
+     * Prevents gaps in the tree (e.g., jumping from Level 0 to Level 2).
+     */
     function normalizeLevels() {
         if (subTasks.length === 0) return;
         
@@ -263,6 +308,10 @@
         }
     }
 
+    /**
+     * Renders the subtask list DOM elements.
+     * Applies indentation styles, drag handles, and event listeners.
+     */
     function renderList() {
         // Ensure hierarchy is valid before rendering
         normalizeLevels();

@@ -3,7 +3,7 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background-color: var(--joplin-background-color);
     color: var(--joplin-color);
     display: flex;
@@ -198,6 +198,22 @@ select:disabled {
 }
 
 /* === DRAG & DROP STYLES === */
+
+.drag-handle {
+    cursor: grab;
+    color: var(--joplin-color);
+    opacity: 0.3;
+    margin-right: 8px;
+    font-size: 0.9rem;
+    line-height: 1;
+    user-select: none;
+    flex-shrink: 0;
+    transition: opacity 0.2s;
+}
+
+.subtask-item:hover .drag-handle {
+    opacity: 0.8;
+}
 
 /* Indentation Guide (Hyphens) - First Element */
 .indent-guide {

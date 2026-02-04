@@ -158,6 +158,12 @@
      */
     function handleDragOver(e) {
         e.preventDefault();
+
+        // Clear all hints first to prevent ghosts
+        document.querySelectorAll('.subtask-item').forEach(el => {
+            el.classList.remove('drop-above', 'drop-below', 'drop-nest');
+        });
+
         const target = e.currentTarget;
         const targetIndex = parseInt(target.dataset.index);
 
@@ -169,8 +175,7 @@
         const height = rect.height;
 
         // Zones: Top 25% (Above), Bottom 25% (Below), Middle 50% (Nest)
-        target.classList.remove('drop-above', 'drop-below', 'drop-nest');
-
+        
         const targetTask = subTasks[targetIndex];
 
         if (relY < height * 0.25) {
@@ -337,7 +342,13 @@
                     li.style.setProperty('--has-parent', 'block');
                 }
 
-                // Indentation Guide (Hyphens) - Placed FIRST (Leftmost)
+                // Drag Handle
+                const dragHandle = document.createElement('span');
+                dragHandle.className = 'drag-handle';
+                dragHandle.textContent = '⋮⋮';
+                li.appendChild(dragHandle);
+
+                // Indentation Guide (Hyphens) - Placed AFTER handle
                 if (task.level > 0) {
                     const indent = document.createElement('span');
                     indent.className = 'indent-guide';

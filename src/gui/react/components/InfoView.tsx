@@ -88,6 +88,7 @@ const InfoView: React.FC = () => {
                     <li style={{ marginBottom: '12px' }}><strong>Double Click:</strong> Opens the <strong>Edit Task</strong> dialog to modify deadlines, priority, or sub-tasks.</li>
                     <li style={{ marginBottom: '12px' }}><strong>Right Click:</strong> Opens a <strong>Context Menu</strong> with options to Edit (GUI), Edit Text (Note), or Delete the task.</li>
                     <li style={{ marginBottom: '12px' }}><strong>(+) Button:</strong> Opens the <strong>New Task</strong> dialog. You can also create new projects directly from there.</li>
+                    <li style={{ marginBottom: '12px' }}><strong>(🚨) Urgent Toggle:</strong> Filters the view to show <strong>ONLY</strong> tasks that are Overdue or Approaching a deadline.</li>
                     <li style={{ marginBottom: '12px' }}><strong>Project Filter:</strong> Use the dropdown in the header to focus on a specific project or view "All Tasks".</li>
                 </ul>
             </section>
@@ -97,6 +98,7 @@ const InfoView: React.FC = () => {
                 <p>Manage complex tasks with 6-level nested hierarchies directly from the Task Dialog or Kanban cards.</p>
                 
                 <h4 style={{ marginTop: '15px', color: 'var(--text-color)', fontSize: '1.1rem' }}>Hierarchical Drag & Drop:</h4>
+                <p style={{ marginBottom: '10px', opacity: 0.9 }}>Use the drag handles (<span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>⋮⋮</span>) to easily grab and move items.</p>
                 <ul style={{ paddingLeft: '25px', marginTop: '10px' }}>
                     <li style={{ marginBottom: '8px' }}><strong>Reorder:</strong> Drag items <strong>above</strong> or <strong>below</strong> others to reorder them as siblings.</li>
                     <li style={{ marginBottom: '8px' }}><strong>Nest:</strong> Drag an item <strong>onto the middle</strong> of another task (highlighted box) to make it a child (sub-task).</li>
@@ -129,8 +131,12 @@ const InfoView: React.FC = () => {
             </section>
 
             <section style={{ marginBottom: '30px' }}>
-                <h3 style={{ color: 'var(--text-color)', fontSize: '1.4rem' }}>⏰ Overdue Tasks</h3>
-                <p>Tasks that have passed their deadline and are not yet completed are highlighted with a <strong>semi-transparent red background</strong> in all views (Kanban cards, Timeline rows, and List items) to signal urgency.</p>
+                <h3 style={{ color: 'var(--text-color)', fontSize: '1.4rem' }}>⏰ Urgency & Deadlines</h3>
+                <p>The dashboard helps you stay on top of deadlines with visual cues in all views (Kanban, Timeline, List):</p>
+                <ul style={{ paddingLeft: '25px', marginTop: '10px' }}>
+                    <li style={{ marginBottom: '8px' }}><span style={{ color: '#e74c3c', fontWeight: 'bold' }}>Red (Overdue):</span> Tasks that have passed their due date and are not yet completed.</li>
+                    <li style={{ marginBottom: '8px' }}><span style={{ color: '#e67e22', fontWeight: 'bold' }}>Orange (Approaching):</span> Tasks due soon. The warning threshold is configurable in the plugin settings (default: 7 days).</li>
+                </ul>
             </section>
 
             <section style={{ marginBottom: '30px' }}>

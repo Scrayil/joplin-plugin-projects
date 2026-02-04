@@ -19,6 +19,16 @@ export const registerSettings = async () => {
             label: "Project Wiki template structure (.json)",
             description: "Select the .json file that defines the custom folder structure for new project wikis. Leave empty for default.",
             advanced: true
+        },
+        [Config.SETTINGS.PROJECT_APPROACHING_DEADLINE]: {
+            value: 7,
+            type: SettingItemType.Int,
+            minimum: 1,
+            maximum: 100,
+            section: Config.SETTINGS.PROJECT_SECTION,
+            public: true,
+            label: "Approaching deadline warning (days)",
+            description: "Tasks due within this number of days will be highlighted in orange."
         }
     });
 

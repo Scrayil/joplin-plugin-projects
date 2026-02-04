@@ -1,5 +1,5 @@
 import { Config } from '../utils/constants';
-import { getPluginDataFolder, readFileContent, writeFileContent, getPluginFolder } from '../utils/utils';
+import { getPluginDataFolder, readFileContent, writeFileContent, getPluginFolder, getSettingValue } from '../utils/utils';
 import { TagService } from './TagService';
 import { NoteParser } from './NoteParser';
 import * as path from 'path';
@@ -145,6 +145,10 @@ export class ProjectService {
             notesWithBody.push(...batchResults);
         }
 
+        const approachingDays = Number(await getSettingValue(Config.SETTINGS.PROJECT_APPROACHING_DEADLINE)) || 7;
+        const now = Date.now();
+        const approachingThreshold = now + (approachingDays * 24 * 60 * 60 * 1000);
+
         const dashboardTasks: any[] = [];
         for (const n of notesWithBody) {
             const project = folderToProjectMap.get(n.parent_id);
@@ -161,6 +165,11 @@ export class ProjectService {
                 status = 'in_progress';
             }
 
+            const isApproaching = status !== 'done' && 
+                                  n.todo_due > 0 && 
+                                  n.todo_due > now && 
+                                  n.todo_due <= approachingThreshold;
+
             dashboardTasks.push({
                 id: n.id,
                 title: n.title,
@@ -171,7 +180,8 @@ export class ProjectService {
                 projectId: project?.id,
                 projectName: project?.name,
                 tags: tags,
-                subTasks: subTasks
+                subTasks: subTasks,
+                isApproaching: isApproaching
             });
         }
 
@@ -184,7 +194,7 @@ export class ProjectService {
         };
         
         this.dashboardCache = data;
-        this.lastSignature = currentSignature;
+        this.lastSignature = currentSignature + `-${approachingDays}`; // Invalidate on setting change
         
         return data;
     }

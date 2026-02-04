@@ -115,12 +115,13 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                         const width = Math.max(endPos - startPos, 0.5);
                         const projectColor = getProjectColor(task.projectId);
                         const isOverdue = task.dueDate! > 0 && task.dueDate! < Date.now() && task.status !== 'done';
+                        const isApproaching = task.isApproaching && !isOverdue && task.status !== 'done';
 
                         return (
-                            <div key={task.id} className={`timeline-row ${isOverdue ? 'overdue' : ''}`} style={{ height: '60px', position: 'relative', borderBottom: '1px solid var(--joplin-divider-color)', margin: '0 10px', cursor: 'pointer' }} 
+                            <div key={task.id} className={`timeline-row ${isOverdue ? 'overdue' : ''} ${isApproaching ? 'approaching' : ''}`} style={{ height: '60px', position: 'relative', borderBottom: '1px solid var(--joplin-divider-color)', margin: '0 10px', cursor: 'pointer' }} 
                                  onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
                                  onContextMenu={(e) => handleContextMenu(e, task)}
-                                 title={`${task.projectName}\n${task.title}${task.dueDate! > 0 ? `\n${formatDate(task.dueDate!)}` : ''}`}>
+                                 title={`${task.projectName}\n${task.title}${task.dueDate! > 0 ? `\n${isOverdue ? '(Overdue) ' : (isApproaching ? '(Approaching) ' : '')}${formatDate(task.dueDate!)}` : ''}`}>
                                 <div style={{ position: 'absolute', left: `${startPos}%`, top: '5px', fontSize: '0.9rem', color: 'var(--joplin-color)', whiteSpace: 'nowrap', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: projectColor, display: 'inline-block', flexShrink: 0 }}></span>
                                     <span style={{ color: 'orange' }}>[{task.projectName}]</span> {task.title}
@@ -151,7 +152,9 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                                     top: '42px', 
                                     fontSize: '0.65rem', 
                                     transform: width < 15 ? 'none' : 'translateX(-100%)', 
-                                    opacity: 0.5, 
+                                    opacity: (isOverdue || isApproaching) ? 1 : 0.5, 
+                                    color: isOverdue ? '#e74c3c' : (isApproaching ? '#e67e22' : 'inherit'),
+                                    fontWeight: (isOverdue || isApproaching) ? 'bold' : 'normal',
                                     textAlign: width < 15 ? 'left' : 'right',
                                     whiteSpace: 'nowrap' // Ensure inline
                                 }}>{formatDate(task.dueDate!, false)}</div>

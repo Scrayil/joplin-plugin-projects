@@ -20,6 +20,7 @@ export interface Task {
     projectName: string;
     tags: string[];
     subTasks: SubTask[];
+    isApproaching?: boolean;
 }
 
 /**

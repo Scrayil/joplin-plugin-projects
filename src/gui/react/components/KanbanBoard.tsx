@@ -216,18 +216,19 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
                         <div className="task-list">
                             {displayedTasks.map((task, index) => {
                                 const isOverdue = task.dueDate > 0 && task.dueDate < Date.now() && task.status !== 'done';
+                                const isApproaching = task.isApproaching && !isOverdue && task.status !== 'done';
                                 return (
                                     <Draggable key={task.id} draggableId={task.id} index={index}>
                                         {(provided) => (
                                             <div 
-                                                className={`task-card ${status === 'done' ? 'done' : ''} ${isOverdue ? 'overdue' : ''}`}
+                                                className={`task-card ${status === 'done' ? 'done' : ''} ${isOverdue ? 'overdue' : ''} ${isApproaching ? 'approaching' : ''}`}
                                                 ref={provided.innerRef}
                                                 {...provided.draggableProps}
                                                 {...provided.dragHandleProps}
                                                 style={{ ...provided.draggableProps.style, cursor: 'pointer' }}
                                                 onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
                                                 onContextMenu={(e) => handleContextMenu(e, task)}
-                                                title={`${task.projectName}\n${task.title}${task.dueDate > 0 ? `\n${formatDate(task.dueDate)}` : ''}`}
+                                                title={`${task.projectName}\n${task.title}${task.dueDate > 0 ? `\n${isOverdue ? '(Overdue) ' : (isApproaching ? '(Approaching) ' : '')}${formatDate(task.dueDate)}` : ''}`}
                                             >
                                                 <div className="task-title">
                                                     <span className="task-project-tag">[{task.projectName}]</span>

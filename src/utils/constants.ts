@@ -11,6 +11,7 @@ export const Config = {
     SETTINGS: {
         PROJECT_SECTION: PREFIX + 'settings_section',
         PROJECT_WIKI_TEMPLATE: PREFIX + 'new_project_wiki_template_setting',
+        PROJECT_APPROACHING_DEADLINE: PREFIX + 'approaching_deadline_days',
     },
 
     MENUS: {

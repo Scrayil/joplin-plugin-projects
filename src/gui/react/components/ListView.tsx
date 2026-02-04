@@ -118,16 +118,16 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
                     ) : (
                         activeTasks.map(task => {
                             const isOverdue = task.dueDate > 0 && task.dueDate < Date.now() && task.status !== 'done';
+                            const isApproaching = task.isApproaching && !isOverdue && task.status !== 'done';
+                            
                             return (
                             <tr 
                                 key={task.id} 
                                 onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
                                 onContextMenu={(e) => handleContextMenu(e, task)}
-                                className={`list-row ${isOverdue ? 'overdue' : ''}`} 
+                                className={`list-row ${isOverdue ? 'overdue' : ''} ${isApproaching ? 'approaching' : ''}`} 
                                 style={{ borderBottom: '1px solid var(--joplin-divider-color)', transition: 'background 0.2s', cursor: 'pointer' }}
-                                title={`${task.projectName}\n${task.title}${task.dueDate > 0 ? `\n${formatDate(task.dueDate)}` : ''}`}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isOverdue ? 'rgba(255, 0, 0, 0.1)' : 'var(--joplin-background-color-hover3)'}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isOverdue ? 'rgba(255, 0, 0, 0.05)' : 'transparent'}
+                                title={`${task.projectName}\n${task.title}${task.dueDate > 0 ? `\n${isOverdue ? '(Overdue) ' : (isApproaching ? '(Approaching) ' : '')}${formatDate(task.dueDate)}` : ''}`}
                             >
                                     <td style={{ 
                                         padding: '12px 10px', 
@@ -158,7 +158,10 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
                                     </td>
                                     <td style={{ padding: '12px 10px', fontSize: '0.85rem' }}>
                                         {task.dueDate && task.dueDate > 0 ? (
-                                            <span style={{ color: task.dueDate < Date.now() ? '#e74c3c' : 'inherit', fontWeight: task.dueDate < Date.now() ? 'bold' : 'normal' }}>
+                                            <span style={{ 
+                                                color: isOverdue ? '#e74c3c' : (isApproaching ? '#e67e22' : 'inherit'), 
+                                                fontWeight: (isOverdue || isApproaching) ? 'bold' : 'normal' 
+                                            }}>
                                                 {formatDate(task.dueDate, false)}
                                             </span>
                                         ) : (

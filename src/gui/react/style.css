@@ -328,16 +328,29 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .task-card.overdue {
-    background-color: rgba(231, 76, 60, 0.15) !important;
+    background-color: rgba(231, 76, 60, 0.2) !important;
     border-color: rgba(231, 76, 60, 0.4) !important;
 }
 
+.task-card.approaching {
+    background-color: rgba(230, 126, 34, 0.2) !important;
+    border-color: rgba(230, 126, 34, 0.4) !important;
+}
+
 .list-row.overdue {
-    background-color: rgba(231, 76, 60, 0.1) !important;
+    background-color: rgba(231, 76, 60, 0.2) !important;
+}
+
+.list-row.approaching {
+    background-color: rgba(230, 126, 34, 0.2) !important;
 }
 
 .timeline-row.overdue {
-    background-color: rgba(231, 76, 60, 0.05) !important;
+    background-color: rgba(231, 76, 60, 0.2) !important;
+}
+
+.timeline-row.approaching {
+    background-color: rgba(230, 126, 34, 0.2) !important;
 }
 
 .task-meta {
@@ -351,11 +364,21 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .task-due {
     font-size: 0.8rem;
     font-weight: 600;
-    color: #e74c3c;
+    color: var(--text-color); /* Default color matching title/subtasks */
     margin-top: 6px;
     display: flex;
     align-items: center;
     gap: 4px;
+}
+
+.task-card.overdue .task-due {
+    color: #e74c3c; /* Red only when overdue */
+    opacity: 1;
+}
+
+.task-card.approaching .task-due {
+    color: #d35400; /* Orange when approaching */
+    opacity: 1;
 }
 
 /* Form Styles */

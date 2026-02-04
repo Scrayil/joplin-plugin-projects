@@ -16,6 +16,7 @@ const App: React.FC = () => {
     const [data, setData] = useState<DashboardData>({ projects: [], tasks: [] });
     const [loading, setLoading] = useState(true);
     const [projectFilter, setProjectFilter] = useState<string>('all');
+    const [showUrgentOnly, setShowUrgentOnly] = useState(false);
     const [lastUpdated, setLastUpdated] = useState(Date.now());
     const isFetching = React.useRef(false);
     const isDialogOpen = React.useRef(false);
@@ -208,9 +209,21 @@ const App: React.FC = () => {
         }
     };
 
-    const displayedTasks = projectFilter === 'all' 
-        ? data.tasks 
-        : data.tasks.filter(t => t.projectId === projectFilter);
+    const displayedTasks = React.useMemo(() => {
+        let tasks = projectFilter === 'all' 
+            ? data.tasks 
+            : data.tasks.filter(t => t.projectId === projectFilter);
+
+        if (showUrgentOnly) {
+            const now = Date.now();
+            tasks = tasks.filter(t => {
+                const isOverdue = t.dueDate > 0 && t.dueDate < now && t.status !== 'done';
+                const isApproaching = t.isApproaching && t.status !== 'done';
+                return isOverdue || isApproaching;
+            });
+        }
+        return tasks;
+    }, [data.tasks, projectFilter, showUrgentOnly]);
 
     if (loading) return <div>Loading tasks...</div>;
 
@@ -241,6 +254,19 @@ const App: React.FC = () => {
                         title="New Task"
                     >
                         +
+                    </button>
+                    <button 
+                        className="action-btn"
+                        onClick={() => setShowUrgentOnly(!showUrgentOnly)} 
+                        style={{ 
+                            fontSize: '1rem',
+                            backgroundColor: showUrgentOnly ? '#e74c3c' : undefined,
+                            color: showUrgentOnly ? 'white' : undefined,
+                            borderColor: showUrgentOnly ? '#c0392b' : undefined
+                        }}
+                        title="Show only urgent tasks (Overdue & Approaching)"
+                    >
+                        🚨
                     </button>
                     <button 
                         className="action-btn"
@@ -279,7 +305,7 @@ const App: React.FC = () => {
                     <button onClick={() => setActiveTab('timeline')} className={activeTab === 'timeline' ? 'active' : ''}>Timeline</button>
                     <button onClick={() => setActiveTab('table')} className={activeTab === 'table' ? 'active' : ''}>List</button>
                     <button onClick={() => setActiveTab('wiki')} className={activeTab === 'wiki' ? 'active' : ''}>Wiki</button>
-                    <button onClick={() => setActiveTab('info')} className={activeTab === 'info' ? 'active' : ''}>Info</button>
+                    <button onClick={() => setActiveTab('info')} className={activeTab === 'info' ? 'active' : ''}>Guide</button>
                 </div>
             </div>
             

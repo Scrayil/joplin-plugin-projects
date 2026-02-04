@@ -1,53 +1,135 @@
+export interface SubTask {
+    title: string;
+    completed: boolean;
+    level: number;
+    originalIndex: number;
+}
+
 export class NoteParser {
     
     /**
-     * Extracts checkbox items from the note body to represent subtasks.
+     * Extracts checkbox items from the note body to represent subtasks, preserving hierarchy.
      * @param body The raw markdown content of the note.
-     * @returns Array of subtask objects containing title and completion status.
+     * @returns Array of subtask objects containing title, completion status, and nesting level.
      */
-    public parseSubTasks(body: string): { title: string; completed: boolean }[] {
-        const subTasks: { title: string; completed: boolean }[] = [];
+    public parseSubTasks(body: string): SubTask[] {
+        const subTasks: SubTask[] = [];
         if (!body) return subTasks;
 
         const lines = body.split('\n');
-        const regex = /^\s*-\s*\[([ xX])\]\s*(.*)$/;
+        // Regex to capture indentation, checkbox state, and title
+        const regex = /^(\s*)-\s*\[([ xX])\]\s*(.*)$/;
 
-        for (const line of lines) {
-            const match = line.match(regex);
+        for (let i = 0; i < lines.length; i++) {
+            const match = lines[i].match(regex);
             if (match) {
+                const indent = match[1];
+                let spaceCount = 0;
+                // Normalize indentation: count tabs as 4 spaces
+                for (const char of indent) {
+                    if (char === '\t') spaceCount += 4;
+                    else spaceCount += 1;
+                }
+                
+                // Use 2 spaces as the unit for 1 indentation level (standard for many editors including Joplin's default list behavior)
+                const level = Math.floor(spaceCount / 2);
+
                 subTasks.push({
-                    completed: match[1].toLowerCase() === 'x',
-                    title: match[2].trim()
+                    title: match[3].trim(),
+                    completed: match[2].toLowerCase() === 'x',
+                    level: level,
+                    originalIndex: i
                 });
             }
         }
+
+        // Post-process: Normalize levels to ensure valid tree structure
+        // (No gaps in hierarchy, e.g., cannot jump from Level 0 to Level 2)
+        if (subTasks.length > 0) {
+            subTasks[0].level = 0; // First item must be root
+            for (let i = 1; i < subTasks.length; i++) {
+                const prevLevel = subTasks[i - 1].level;
+                // A task can be at most 1 level deeper than the previous one
+                if (subTasks[i].level > prevLevel + 1) {
+                    subTasks[i].level = prevLevel + 1;
+                }
+            }
+        }
+
         return subTasks;
     }
 
     /**
-     * Toggles the completion status of a specific subtask within the markdown body.
+     * Toggles the completion status of a specific subtask by its index.
+     * Implements "Loose Hierarchy" logic:
+     * - Checking a task checks all its descendants (convenience).
+     * - Unchecking a task affects ONLY that task (safety).
+     * - Child status NEVER affects parent status.
      */
-    public updateSubTaskStatus(body: string, subTaskTitle: string, checked: boolean): string {
+    public updateSubTaskStatus(body: string, targetIndex: number, checked: boolean): string {
         const lines = body.split('\n');
-        const escapedTitle = subTaskTitle.replace(/[.*+?^${}()|[\\]/g, '\\$&');
-        // Added $ anchor to ensure we match the exact task title and not a prefix
-        const regex = new RegExp(`^(\\s*-\\s*\\[)([ xX])(\\]\\s*${escapedTitle})\\s*$`);
+        let tasks = this.parseSubTasks(body);
+        
+        if (targetIndex < 0 || targetIndex >= tasks.length) return body;
 
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            const match = line.match(regex);
-            
-            if (match) {
-                const newMark = checked ? 'x' : ' ';
-                lines[i] = line.replace(regex, `$1${newMark}$3`);
-                return lines.join('\n');
+        // Apply change to target
+        tasks[targetIndex].completed = checked;
+
+        // 1. Cascade Down (Parent -> Children)
+        // Only propagate if we are CHECKING the task. 
+        if (checked) {
+            for (let i = targetIndex + 1; i < tasks.length; i++) {
+                if (tasks[i].level > tasks[targetIndex].level) {
+                    tasks[i].completed = true;
+                } else {
+                    break; // Stop when we hit a sibling or parent
+                }
             }
         }
-        return body; // Return original body if no match found
+
+        // 2. Cascade Up (Safety Uncheck)
+        // If we are UNCHECKING a child, the parent cannot be considered done.
+        // We traverse up and uncheck all parents.
+        if (!checked) {
+            let currentLevel = tasks[targetIndex].level;
+            let currentIndex = targetIndex;
+
+            while (currentLevel > 0) {
+                // Find parent
+                let parentIndex = -1;
+                for (let i = currentIndex - 1; i >= 0; i--) {
+                    if (tasks[i].level < currentLevel) {
+                        parentIndex = i;
+                        break;
+                    }
+                }
+
+                if (parentIndex === -1) break;
+
+                // Uncheck parent
+                tasks[parentIndex].completed = false;
+
+                // Move up
+                currentIndex = parentIndex;
+                currentLevel = tasks[parentIndex].level;
+            }
+        }
+
+        // Reconstruct body
+        const newLines = [...lines];
+        for (const task of tasks) {
+            const originalLine = lines[task.originalIndex];
+            const indentMatch = originalLine.match(/^(\s*)-/);
+            const prefix = indentMatch ? indentMatch[1] : '  '.repeat(task.level);
+            const mark = task.completed ? 'x' : ' ';
+            newLines[task.originalIndex] = `${prefix}- [${mark}] ${task.title}`;
+        }
+
+        return newLines.join('\n');
     }
 
     /**
-     * Updates the status of all subtasks in the body to match the parent task's completion state.
+     * Updates all subtasks (simple global toggle).
      */
     public updateAllSubTasks(body: string, completed: boolean): string {
         if (completed) {
@@ -58,107 +140,69 @@ export class NoteParser {
     }
 
     /**
-     * Replaces existing subtasks in the note body with a new list of subtasks,
-     * attempting to preserve the original layout (newlines, context) as much as possible.
+     * Replaces existing subtasks in the note body with a new list.
+     * Handles complex replacement while preserving indentation.
      */
-    public updateNoteBodyWithSubTasks(currentBody: string, newSubTasks: string[]): string {
+    public updateNoteBodyWithSubTasks(currentBody: string, newSubTasks: any[]): string {
         const lines = currentBody.split('\n');
         const checkboxRegex = /^\s*-\s*\[([ xX])\]\s*(.*)$/;
         
-        const existingTasks: { lineIndex: number; title: string; originalLine: string }[] = [];
+        let firstTaskLine = -1;
+        let lastTaskLine = -1;
+
         for (let i = 0; i < lines.length; i++) {
-            const match = lines[i].match(checkboxRegex);
-            if (match) {
-                existingTasks.push({
-                    lineIndex: i,
-                    title: match[2].trim(),
-                    originalLine: lines[i]
-                });
+            if (checkboxRegex.test(lines[i])) {
+                if (firstTaskLine === -1) firstTaskLine = i;
+                lastTaskLine = i;
             }
         }
 
-        if (existingTasks.length === 0) {
-            const newLines = newSubTasks.map(st => `- [ ] ${st}`);
+        // Format new tasks to markdown
+        const formattedNewTasks = newSubTasks.map(st => {
+            // Handle both string array (legacy) and object array
+            if (typeof st === 'string') {
+                if (st.trim().startsWith('- [')) return st;
+                 const match = st.match(/^(\s*)(.*)/);
+                 const indent = match ? match[1] : '';
+                 const title = match ? match[2] : st;
+                 return `${indent}- [ ] ${title}`;
+            } else {
+                const indent = '  '.repeat(st.level || 0);
+                const mark = st.completed ? 'x' : ' ';
+                return `${indent}- [${mark}] ${st.title}`;
+            }
+        });
+
+        if (firstTaskLine === -1) {
             if (currentBody.trim().length > 0) {
-                return currentBody + '\n\n' + newLines.join('\n');
+                return currentBody + '\n\n' + formattedNewTasks.join('\n');
             } else {
-                return newLines.join('\n');
+                return formattedNewTasks.join('\n');
             }
+        } else {
+            const before = lines.slice(0, firstTaskLine);
+            const after = lines.slice(lastTaskLine + 1);
+            return [...before, ...formattedNewTasks, ...after].join('\n');
         }
-
-        const keptExistingIndices = new Set<number>();
-        const insertions = new Map<number, string[]>();
-        
-        let lastMatchedExistingIndex = -1;
-        let currentExistingSearchIdx = 0;
-
-        const initialInsertions: string[] = [];
-        let collectingInitial = true;
-
-        for (const newTaskTitle of newSubTasks) {
-            let found = false;
-            
-            for (let i = currentExistingSearchIdx; i < existingTasks.length; i++) {
-                if (existingTasks[i].title === newTaskTitle) {
-                    keptExistingIndices.add(existingTasks[i].lineIndex);
-                    lastMatchedExistingIndex = existingTasks[i].lineIndex;
-                    currentExistingSearchIdx = i + 1;
-                    found = true;
-                    collectingInitial = false;
-                    break;
-                }
-            }
-
-            if (!found) {
-                if (collectingInitial) {
-                    initialInsertions.push(newTaskTitle);
-                } else {
-                    if (!insertions.has(lastMatchedExistingIndex)) {
-                        insertions.set(lastMatchedExistingIndex, []);
-                    }
-                    insertions.get(lastMatchedExistingIndex)!.push(newTaskTitle);
-                }
-            }
-        }
-
-        const resultLines: string[] = [];
-        const existingLineIndices = new Set(existingTasks.map(t => t.lineIndex));
-        let initialInsertionsFlushed = false;
-        
-        for (let i = 0; i < lines.length; i++) {
-            const isCheckbox = existingLineIndices.has(i);
-
-            if (!isCheckbox) {
-                resultLines.push(lines[i]);
-            } else {
-                if (keptExistingIndices.has(i)) {
-                    if (!initialInsertionsFlushed && initialInsertions.length > 0) {
-                         initialInsertions.forEach(t => resultLines.push(`- [ ] ${t}`));
-                         initialInsertionsFlushed = true;
-                    }
-
-                    resultLines.push(lines[i]);
-
-                    if (insertions.has(i)) {
-                        insertions.get(i)!.forEach(t => resultLines.push(`- [ ] ${t}`));
-                    }
-                } else {
-                    if (!initialInsertionsFlushed && initialInsertions.length > 0) {
-                         initialInsertions.forEach(t => resultLines.push(`- [ ] ${t}`));
-                         initialInsertionsFlushed = true;
-                    }
-                }
-            }
-        }
-
-        return resultLines.join('\n');
     }
 
     /**
-     * Generates a markdown list of checkboxes from an array of string titles.
+     * Generates a markdown list from an array of strings or objects.
      */
-    public createBodyFromSubTasks(subTasks: string[]): string {
+    public createBodyFromSubTasks(subTasks: any[]): string {
         if (!subTasks || subTasks.length === 0) return "";
-        return subTasks.map(st => `- [ ] ${st}`).join('\n');
+        return subTasks.map(st => {
+             if (typeof st === 'string') {
+                 if (st.trim().startsWith('- [')) return st;
+                 const match = st.match(/^(\s*)(.*)/);
+                 const indent = match ? match[1] : '';
+                 const title = match ? match[2] : st;
+                 return `${indent}- [ ] ${title}`;
+             } else {
+                const indent = '  '.repeat(st.level || 0);
+                const mark = st.completed ? 'x' : ' ';
+                return `${indent}- [${mark}] ${st.title}`;
+             }
+        }).join('\n');
     }
 }

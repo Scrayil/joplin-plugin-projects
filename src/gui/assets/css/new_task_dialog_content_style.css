@@ -132,12 +132,14 @@ select:disabled {
 }
 
 .subtask-item {
+    position: relative;
     display: flex;
-    justify-content: space-between;
     align-items: center;
     padding: 8px 12px;
     border-bottom: 1px solid rgba(127, 127, 127, 0.5);
     min-height: 42px;
+    cursor: grab;
+    transition: background-color 0.2s;
 }
 
 .subtask-item:last-child {
@@ -145,8 +147,11 @@ select:disabled {
 }
 
 .subtask-item.empty {
+    display: flex;
     color: transparent;
     user-select: none;
+    pointer-events: none;
+    cursor: default;
 }
 
 .btn-add {
@@ -172,6 +177,7 @@ select:disabled {
     font-weight: bold;
     font-size: 1.1rem;
     visibility: hidden;
+    margin-left: auto; /* Push to right */
 }
 
 .subtask-item:not(.empty) .btn-remove {
@@ -181,10 +187,48 @@ select:disabled {
 ::-webkit-scrollbar {
     width: 8px;
 }
+
 ::-webkit-scrollbar-track {
     background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
     background: rgba(127, 127, 127, 0.5);
     border-radius: 4px;
+}
+
+/* === DRAG & DROP STYLES === */
+
+/* Indentation Guide (Hyphens) - First Element */
+.indent-guide {
+    color: var(--joplin-color);
+    opacity: 0.4;
+    margin-right: 6px; 
+    font-family: monospace;
+    font-weight: bold;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.subtask-item span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Drop Targets - VISUAL HINTS RESTORED */
+
+.subtask-item.drop-above {
+    border-top: 2px solid var(--joplin-color);
+}
+
+.subtask-item.drop-below {
+    border-bottom: 2px solid var(--joplin-color);
+}
+
+.subtask-item.drop-nest {
+    /* Dashed border + light background for nesting hint */
+    border: 1px dashed var(--joplin-color);
+    background-color: rgba(127, 127, 127, 0.1);
+    opacity: 0.9;
 }

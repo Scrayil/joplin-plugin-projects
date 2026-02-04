@@ -148,7 +148,10 @@ export class TaskDashboard {
                     if (!Number.isFinite(dueDate)) dueDate = 0;
 
                     const subTasksStr = formData.taskSubTasks || "";
-                    const subTasks = subTasksStr.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+                    // Preserve leading indentation for nested tasks, only trim trailing whitespace
+                    const subTasks = subTasksStr.split('\n')
+                        .map((s: string) => s.replace(/\s+$/, ''))
+                        .filter((s: string) => s.trim().length > 0);
 
                     await this.updateTask(task.id, { subTasks, urgency, dueDate });
                 } else if (result.action === 'delete') {
@@ -204,10 +207,10 @@ export class TaskDashboard {
             if (dueDate !== undefined && !Number.isFinite(dueDate)) dueDate = undefined;
 
             const subTasksStr = formData.taskSubTasks || "";
-            // Process subtasks: Trim, Filter empty, and Auto-Linkify
+            // Process subtasks: Trim RIGHT only to preserve indentation, Filter empty, and Auto-Linkify
             const subTasks = subTasksStr.split('\n')
-                .map((s: string) => s.trim())
-                .filter((s: string) => s.length > 0)
+                .map((s: string) => s.replace(/\s+$/, '')) // Preserve leading spaces
+                .filter((s: string) => s.trim().length > 0)
                 .map((s: string) => {
                     // Regex to find http/https URLs not already linked.
                     // 1. Negative lookbehind (?<!...) to ensure we aren't inside a markdown link ](url) or html attribute ="url"
@@ -310,9 +313,10 @@ export class TaskDashboard {
     /**
      * Toggles a specific subtask checkbox within the note markdown body.
      */
-    private async toggleSubTask(payload: { taskId: string, subTaskTitle: string, checked: boolean }) {
+    private async toggleSubTask(payload: { taskId: string, subTaskIndex: number, checked: boolean }) {
         const note = await getNote(payload.taskId, ['body']);
-        const newBody = this.noteParser.updateSubTaskStatus(note.body, payload.subTaskTitle, payload.checked);
+        // Use Index instead of Title for robustness
+        const newBody = this.noteParser.updateSubTaskStatus(note.body, payload.subTaskIndex, payload.checked);
         
         if (newBody !== note.body) {
             await updateNote(payload.taskId, { body: newBody });

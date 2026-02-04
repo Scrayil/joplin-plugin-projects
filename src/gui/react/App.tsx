@@ -179,11 +179,12 @@ const App: React.FC = () => {
         }
     };
 
-    const handleToggleSubTask = async (taskId: string, subTaskTitle: string, checked: boolean) => {
+    const handleToggleSubTask = async (taskId: string, subTaskIndex: number, checked: boolean) => {
          const updatedTasks = data.tasks.map(t => {
              if (t.id === taskId) {
-                 const newSubTasks = t.subTasks.map(st => 
-                     st.title === subTaskTitle ? { ...st, completed: checked } : st
+                 // Use Index for optimistic update
+                 const newSubTasks = t.subTasks.map((st, i) => 
+                     i === subTaskIndex ? { ...st, completed: checked } : st
                  );
                  return { ...t, subTasks: newSubTasks };
              }
@@ -192,7 +193,7 @@ const App: React.FC = () => {
          setData({ ...data, tasks: updatedTasks });
 
          try {
-             await window.webviewApi.postMessage({ name: 'toggleSubTask', payload: { taskId, subTaskTitle, checked } });
+             await window.webviewApi.postMessage({ name: 'toggleSubTask', payload: { taskId, subTaskIndex, checked } });
         } catch (error) {
             console.error("Error toggling subtask:", error);
             fetchData();

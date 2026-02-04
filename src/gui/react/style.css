@@ -282,6 +282,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: flex;
     flex-direction: column;
     max-height: 250px;
+    overflow: hidden; /* Ensure content stays within card bounds */
 }
 
 .task-project-tag {
@@ -297,9 +298,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     font-weight: 600;
     line-height: 1.4;
     margin-bottom: 4px;
+    flex-shrink: 0; /* Title always visible */
     /* Multi-line truncation */
     display: -webkit-box;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -307,11 +309,14 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .task-subtasks-container {
-    overflow-y: auto; /* Make subtasks scrollable within card */
+    overflow-y: auto; /* Scrollable subtasks */
+    overflow-x: auto; /* Allow horizontal scroll for deep nesting */
     margin-top: 8px;
     padding-right: 4px;
     border-top: 1px solid var(--border-color);
     padding-top: 8px;
+    flex: 1; /* Take remaining space */
+    min-height: 0; /* Allow shrinking to trigger scroll */
 }
 
 .task-card.done {

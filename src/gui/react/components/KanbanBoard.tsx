@@ -9,7 +9,7 @@ import TaskContextMenu from './TaskContextMenu';
 interface KanbanBoardProps {
     tasks: Task[];
     onUpdateStatus: (taskId: string, newStatus: string) => void;
-    onToggleSubTask: (taskId: string, subTaskTitle: string, checked: boolean) => void;
+    onToggleSubTask: (taskId: string, subTaskIndex: number, checked: boolean) => void;
     onOpenNote: (taskId: string) => void;
     onEditTask: (task: Task) => void;
 }
@@ -94,43 +94,72 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
         if (!task.subTasks || task.subTasks.length === 0) return null;
         return (
             <div className="task-subtasks-container">
-                {task.subTasks.map((st, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', marginBottom: '4px' }}>
-                        <input 
-                            type="checkbox" 
-                            checked={st.completed} 
-                            onChange={(e) => {
-                                e.stopPropagation();
-                                onToggleSubTask(task.id, st.title, e.target.checked);
-                            }}
-                            style={{ cursor: 'pointer', flexShrink: 0 }}
-                        />
-                        <span 
-                            style={{ 
-                                textDecoration: st.completed ? 'line-through' : 'none', 
-                                color: st.completed ? 'var(--joplin-divider-color)' : 'var(--text-color)',
-                                opacity: st.completed ? 0.6 : 1,
-                                overflowWrap: 'anywhere' // Ensure long URLs wrap
-                            }}
-                            onClick={(e) => {
-                                e.stopPropagation(); // Prevent opening the note card
-                                const target = e.target as HTMLElement;
-                                // Intercept link clicks to force external browser
-                                if (target.tagName === 'A') {
-                                    e.preventDefault();
-                                    const href = (target as HTMLAnchorElement).href;
-                                    window.webviewApi.postMessage({ name: 'openExternal', payload: href });
-                                }
-                            }}
-                            dangerouslySetInnerHTML={{ 
-                                __html: DOMPurify.sanitize(mdParser.renderInline(st.title), { 
-                                    ADD_ATTR: ['target'],
-                                    ALLOWED_URI_REGEXP: /^https?:/i // Strictly allow only http and https
-                                }) 
-                            }} 
-                        />
-                    </div>
-                ))}
+                {task.subTasks.map((st: any, i) => {
+                    const level = st.level || 0;
+                    
+                    return (
+                        <div key={i} style={{ 
+                            display: 'flex', 
+                            alignItems: 'flex-start', // Align to top for multi-line text
+                            gap: '6px', 
+                            fontSize: '0.9rem', 
+                            marginBottom: '4px'
+                        }}>
+                            {/* Indentation Hyphens placed BEFORE the checkbox */}
+                            {level > 0 && (
+                                <span style={{
+                                    color: 'var(--joplin-divider-color)',
+                                    fontFamily: 'monospace',
+                                    fontWeight: 'bold',
+                                    userSelect: 'none',
+                                    marginRight: '2px',
+                                    flexShrink: 0,
+                                    marginTop: '3px' // Visual alignment with first line of text
+                                }}>
+                                    {'-'.repeat(level)}
+                                </span>
+                            )}
+
+                            <input 
+                                type="checkbox" 
+                                checked={st.completed} 
+                                onChange={(e) => {
+                                    e.stopPropagation();
+                                    onToggleSubTask(task.id, i, e.target.checked);
+                                }}
+                                style={{ 
+                                    cursor: 'pointer', 
+                                    flexShrink: 0,
+                                    marginTop: '3px' // Visual alignment with first line of text
+                                }}
+                            />
+                            <span 
+                                style={{ 
+                                    textDecoration: st.completed ? 'line-through' : 'none', 
+                                    color: st.completed ? 'var(--joplin-divider-color)' : 'var(--text-color)',
+                                    opacity: st.completed ? 0.6 : 1,
+                                    overflowWrap: 'anywhere',
+                                    lineHeight: '1.4'
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    const target = e.target as HTMLElement;
+                                    if (target.tagName === 'A') {
+                                        e.preventDefault();
+                                        const href = (target as HTMLAnchorElement).href;
+                                        window.webviewApi.postMessage({ name: 'openExternal', payload: href });
+                                    }
+                                }}
+                                dangerouslySetInnerHTML={{ 
+                                    __html: DOMPurify.sanitize(mdParser.renderInline(st.title), { 
+                                        ADD_ATTR: ['target'],
+                                        ALLOWED_URI_REGEXP: /^https?:/i 
+                                    }) 
+                                }} 
+                            />
+                        </div>
+                    );
+                })}
             </div>
         );
     };

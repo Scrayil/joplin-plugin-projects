@@ -93,6 +93,31 @@ const InfoView: React.FC = () => {
             </section>
 
             <section style={{ marginBottom: '30px' }}>
+                <h3 style={{ color: 'var(--text-color)', fontSize: '1.4rem' }}>🏗️ Advanced Sub-tasks</h3>
+                <p>Manage complex tasks with 6-level nested hierarchies directly from the Task Dialog or Kanban cards.</p>
+                
+                <h4 style={{ marginTop: '15px', color: 'var(--text-color)', fontSize: '1.1rem' }}>Hierarchical Drag & Drop:</h4>
+                <ul style={{ paddingLeft: '25px', marginTop: '10px' }}>
+                    <li style={{ marginBottom: '8px' }}><strong>Reorder:</strong> Drag items <strong>above</strong> or <strong>below</strong> others to reorder them as siblings.</li>
+                    <li style={{ marginBottom: '8px' }}><strong>Nest:</strong> Drag an item <strong>onto the middle</strong> of another task (highlighted box) to make it a child (sub-task).</li>
+                    <li style={{ marginBottom: '8px' }}><strong>Smart Placement:</strong> 
+                        <ul style={{ paddingLeft: '20px', marginTop: '5px' }}>
+                            <li>New items are always appended to the end of the parent's block (keeping families together).</li>
+                            <li><strong>Max Depth:</strong> Nesting is limited to 6 levels. Attempting to nest deeper will force the item to be a sibling.</li>
+                            <li><strong>Break Out:</strong> Dropping an item <strong>below</strong> a max-level task will automatically reset it to the Root level, allowing you to easily exit deep indentation.</li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <h4 style={{ marginTop: '15px', color: 'var(--text-color)', fontSize: '1.1rem' }}>Smart Checkboxes (Cascading Logic):</h4>
+                <ul style={{ paddingLeft: '25px', marginTop: '10px' }}>
+                    <li style={{ marginBottom: '8px' }}><strong>Check Parent:</strong> Automatically checks <strong>all nested sub-tasks</strong> (convenience).</li>
+                    <li style={{ marginBottom: '8px' }}><strong>Uncheck Child:</strong> Automatically unchecks <strong>all parent tasks</strong> up to the root (safety: a parent cannot be done if a child isn't).</li>
+                    <li style={{ marginBottom: '8px' }}><strong>Independent Uncheck:</strong> Unchecking a parent does <strong>NOT</strong> uncheck children (preserves your progress on sub-items).</li>
+                </ul>
+            </section>
+
+            <section style={{ marginBottom: '30px' }}>
                 <h3 style={{ color: 'var(--text-color)', fontSize: '1.4rem' }}>🚦 Sorting Logic</h3>
                 <p>Tasks in all views are consistently ordered by:</p>
                 <ol style={{ paddingLeft: '25px' }}>

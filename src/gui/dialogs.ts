@@ -179,7 +179,7 @@ export async function editTaskDialog(task: any) {
     }
 
     // Subtasks are handled by the script which reads the hidden input value
-    const subTasksStr = task.subTasks.map((st: any) => st.title).join('\n');
+    const subTasksStr = task.subTasks.map((st: any) => '  '.repeat(st.level || 0) + st.title).join('\n');
     // Inject subtasks into hidden field, ensuring quotes are escaped
     html = html.replace('id="taskSubTasks" name="taskSubTasks" value=""', `id="taskSubTasks" name="taskSubTasks" value="${subTasksStr.replace(/"/g, '&quot;')}"`);
 

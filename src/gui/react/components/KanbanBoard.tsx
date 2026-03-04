@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Task, Project } from '../types';
-import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import {formatDate} from "../utils";
 import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
@@ -60,7 +60,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
     /**
      * Handles the end of a drag-and-drop operation for tasks.
      * Updates the task status if moved to a different column.
-     * @param result The drop result object from react-beautiful-dnd.
+     * @param result The drop result object from @hello-pangea/dnd.
      */
     const onDragEnd = (result: DropResult) => {
         const { destination, source, draggableId } = result;

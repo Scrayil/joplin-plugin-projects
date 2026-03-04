@@ -6,6 +6,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { getOrInitProjectRootId } from '../utils/projects';
 import { fetchAllItems, getNote, createNotebook, getFolder, getResourcePath, getResource } from '../utils/database';
+import { PersistenceService } from './PersistenceService';
+import { SyncService } from './SyncService';
 
 /**
  * Service responsible for aggregating project data, scanning folders, and maintaining the dashboard state.
@@ -14,6 +16,8 @@ import { fetchAllItems, getNote, createNotebook, getFolder, getResourcePath, get
 export class ProjectService {
     private tagService: TagService;
     private noteParser: NoteParser;
+    private persistence: PersistenceService;
+    private syncService: SyncService;
     private projectMeta: { [key: string]: string } = {};
     private dashboardCache: any = null;
     private lastSignature: string = '';
@@ -21,6 +25,8 @@ export class ProjectService {
     constructor() {
         this.tagService = new TagService();
         this.noteParser = new NoteParser();
+        this.persistence = PersistenceService.getInstance();
+        this.syncService = SyncService.getInstance();
         this.loadProjectMeta();
     }
 
@@ -198,13 +204,30 @@ export class ProjectService {
         
         return data;
     }
+/**
+ * Persists a manual ordering of Wiki items for a specific parent.
+ * 
+ * @param projectId The project ID.
+ * @param parentId The ID of the parent folder (or project root).
+ * @param orderedIds Array of child IDs in the desired order.
+ */
+public async saveWikiOrder(projectId: string, parentId: string, orderedIds: string[]) {
+    const allOrders = await this.syncService.getWikiOrders();
+    if (!allOrders[projectId]) allOrders[projectId] = {};
 
-    /**
-     * Forcefully invalidates the dashboard cache.
+    allOrders[projectId][parentId] = orderedIds;
+
+    await this.syncService.saveWikiOrders(allOrders);
+}
+
+/**
+ * Forcefully invalidates the dashboard cache.
+...
      * Useful when changes (like tag updates) might not be reflected in the note's updated_time.
      */
     public invalidateCache() {
         this.lastSignature = '';
+        this.syncService.invalidateCache();
     }
 
     /**
@@ -315,15 +338,20 @@ export class ProjectService {
         // Fetch structure
         const allFolders = await this.fetchAllFolders(['id', 'parent_id', 'title']);
         let rootFolders: any[] = [];
+        let rootParentId = '';
         
         if (projectId === 'all') {
             const rootId = await getOrInitProjectRootId(false);
             if (rootId) {
                 rootFolders = allFolders.filter((f: any) => f.parent_id === rootId);
+                rootParentId = rootId;
             }
         } else {
             const project = allFolders.find((f: any) => f.id === projectId);
-            if (project) rootFolders = [project];
+            if (project) {
+                rootFolders = [project];
+                rootParentId = project.parent_id;
+            }
         }
 
         // Map structure
@@ -368,32 +396,95 @@ export class ProjectService {
             }
         });
 
-        // Sort
-        folderMap.forEach((node) => {
-            node.children.sort((a: any, b: any) => {
-                if (a.type !== b.type) return a.type === 'note' ? -1 : 1;
-                return a.title.localeCompare(b.title);
-            });
-        });
+        // Load Custom Orders from SyncService for cross-device consistency
+        const allOrders = await this.syncService.getWikiOrders();
+        const projectOrders = allOrders[projectId] || {};
+
+        // Sort children for each folder
+        const sortChildren = (parentId: string, children: any[]) => {
+            const savedOrder = projectOrders[parentId];
+            
+            if (savedOrder && Array.isArray(savedOrder)) {
+                // Manual Sort:
+                // 1. Existing items in saved order
+                // 2. New items (not in saved order) appended at the end
+                const orderedIds = new Set(savedOrder);
+                const itemsInOrder = savedOrder
+                    .map(id => children.find(c => c.id === id))
+                    .filter(c => !!c);
+                
+                const newItems = children.filter(c => !orderedIds.has(c.id));
+                // Sort new items alphabetically among themselves
+                newItems.sort((a, b) => a.title.localeCompare(b.title));
+
+                return [...itemsInOrder, ...newItems];
+            } else {
+                // Fallback: Alphabetical Sort
+                return children.sort((a: any, b: any) => {
+                    if (a.type !== b.type) return a.type === 'note' ? -1 : 1;
+                    return a.title.localeCompare(b.title);
+                });
+            }
+        };
 
         // Flatten Tree (DFS) to create the "Book" sequence
         const flatList: any[] = [];
-        const traverse = (node: any, level: number) => {
-            // Add the node itself (Folder as Section Header, Note as Content placeholder)
+        const traverse = (node: any, level: number, parentId: string, currentProjectRootId: string) => {
+            // Add the node itself
             flatList.push({ 
                 id: node.id, 
                 title: node.title, 
                 type: node.type, 
                 level: level,
-                body: '' // Will fetch later
+                parentId: parentId,
+                body: '' 
             });
 
             if (node.children) {
-                node.children.forEach((child: any) => traverse(child, level + 1));
+                // If we are at root level in 'all' view, the node itself IS the project root
+                const projectRootId = (currentProjectRootId === 'all') ? node.id : currentProjectRootId;
+                const projectOrdersForNode = allOrders[projectRootId] || {};
+                const savedOrder = projectOrdersForNode[node.id];
+
+                let sortedChildren = [];
+                if (savedOrder && Array.isArray(savedOrder)) {
+                    const orderedIds = new Set(savedOrder);
+                    const itemsInOrder = savedOrder.map(id => node.children.find(c => c.id === id)).filter(c => !!c);
+                    const newItems = node.children.filter(c => !orderedIds.has(c.id));
+                    newItems.sort((a, b) => a.title.localeCompare(b.title));
+                    sortedChildren = [...itemsInOrder, ...newItems];
+                } else {
+                    sortedChildren = node.children.sort((a: any, b: any) => {
+                        if (a.type !== b.type) return a.type === 'note' ? -1 : 1;
+                        return a.title.localeCompare(b.title);
+                    });
+                }
+
+                sortedChildren.forEach((child: any) => traverse(child, level + 1, node.id, projectRootId));
             }
         };
 
-        rootFolders.forEach(r => traverse(folderMap.get(r.id), 0));
+        // Special case for root-level sorting (the projects themselves)
+        const rootChildren = projectId === 'all' 
+            ? rootFolders.map(r => folderMap.get(r.id))
+            : [folderMap.get(projectId)];
+        
+        // Use 'all' as the project root for the global projects sequence
+        const globalOrders = allOrders['all'] || {};
+        const savedGlobalOrder = globalOrders[rootParentId];
+
+        let sortedRoot = [];
+        if (savedGlobalOrder && Array.isArray(savedGlobalOrder)) {
+            const orderedIds = new Set(savedGlobalOrder);
+            const itemsInOrder = savedGlobalOrder.map(id => rootChildren.find(c => c.id === id)).filter(c => !!c);
+            const newItems = rootChildren.filter(c => !orderedIds.has(c.id));
+            newItems.sort((a, b) => a.title.localeCompare(b.title));
+            sortedRoot = [...itemsInOrder, ...newItems];
+        } else {
+            sortedRoot = rootChildren.sort((a, b) => a.title.localeCompare(b.title));
+        }
+
+        sortedRoot.forEach(r => traverse(r, 0, rootParentId, projectId));
 
         // Fetch bodies ONLY for notes (folders are just headers)
         // Batched processing

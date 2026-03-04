@@ -56,6 +56,10 @@ export class TaskDashboard {
                 if (message.name === 'getWikiData') {
                     return await this.projectService.getProjectWiki(message.payload.projectId);
                 }
+                if (message.name === 'saveWikiOrder') {
+                    const { projectId, parentId, orderedIds } = message.payload;
+                    return await this.projectService.saveWikiOrder(projectId, parentId, orderedIds);
+                }
                 if (message.name === 'openEditTaskDialog') {
                     return await this.handleEditTaskDialog(message.payload.task);
                 }

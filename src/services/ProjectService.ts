@@ -1,5 +1,5 @@
 import { Config } from '../utils/constants';
-import { getPluginDataFolder, readFileContent, writeFileContent, getPluginFolder, getSettingValue } from '../utils/utils';
+import { getPluginDataFolder, readFileContent, writeFileContent, getPluginFolder, getSettingValue, sanitizeTitle } from '../utils/utils';
 import { TagService } from './TagService';
 import { NoteParser } from './NoteParser';
 import * as path from 'path';
@@ -192,7 +192,9 @@ export class ProjectService {
         }
 
         const data = {
-            projects: projectFolders.map((p: any) => ({ id: p.id, name: p.title })),
+            projects: projectFolders
+                .sort((a, b) => sanitizeTitle(a.title).localeCompare(sanitizeTitle(b.title), undefined, { sensitivity: 'accent' }))
+                .map((p: any) => ({ id: p.id, name: p.title })),
             tasks: dashboardTasks,
             config: {
                 pollingInterval: 3000
@@ -415,14 +417,14 @@ public async saveWikiOrder(projectId: string, parentId: string, orderedIds: stri
                 
                 const newItems = children.filter(c => !orderedIds.has(c.id));
                 // Sort new items alphabetically among themselves
-                newItems.sort((a, b) => a.title.localeCompare(b.title));
+                newItems.sort((a, b) => sanitizeTitle(a.title).localeCompare(sanitizeTitle(b.title), undefined, { sensitivity: 'accent' }));
 
                 return [...itemsInOrder, ...newItems];
             } else {
                 // Fallback: Alphabetical Sort
                 return children.sort((a: any, b: any) => {
                     if (a.type !== b.type) return a.type === 'note' ? -1 : 1;
-                    return a.title.localeCompare(b.title);
+                    return sanitizeTitle(a.title).localeCompare(sanitizeTitle(b.title), undefined, { sensitivity: 'accent' });
                 });
             }
         };
@@ -451,12 +453,12 @@ public async saveWikiOrder(projectId: string, parentId: string, orderedIds: stri
                     const orderedIds = new Set(savedOrder);
                     const itemsInOrder = savedOrder.map(id => node.children.find(c => c.id === id)).filter(c => !!c);
                     const newItems = node.children.filter(c => !orderedIds.has(c.id));
-                    newItems.sort((a, b) => a.title.localeCompare(b.title));
+                    newItems.sort((a, b) => sanitizeTitle(a.title).localeCompare(sanitizeTitle(b.title), undefined, { sensitivity: 'accent' }));
                     sortedChildren = [...itemsInOrder, ...newItems];
                 } else {
                     sortedChildren = node.children.sort((a: any, b: any) => {
                         if (a.type !== b.type) return a.type === 'note' ? -1 : 1;
-                        return a.title.localeCompare(b.title);
+                        return sanitizeTitle(a.title).localeCompare(sanitizeTitle(b.title), undefined, { sensitivity: 'accent' });
                     });
                 }
 
@@ -478,10 +480,10 @@ public async saveWikiOrder(projectId: string, parentId: string, orderedIds: stri
             const orderedIds = new Set(savedGlobalOrder);
             const itemsInOrder = savedGlobalOrder.map(id => rootChildren.find(c => c.id === id)).filter(c => !!c);
             const newItems = rootChildren.filter(c => !orderedIds.has(c.id));
-            newItems.sort((a, b) => a.title.localeCompare(b.title));
+            newItems.sort((a, b) => sanitizeTitle(a.title).localeCompare(sanitizeTitle(b.title), undefined, { sensitivity: 'accent' }));
             sortedRoot = [...itemsInOrder, ...newItems];
         } else {
-            sortedRoot = rootChildren.sort((a, b) => a.title.localeCompare(b.title));
+            sortedRoot = rootChildren.sort((a, b) => sanitizeTitle(a.title).localeCompare(sanitizeTitle(b.title), undefined, { sensitivity: 'accent' }));
         }
 
         sortedRoot.forEach(r => traverse(r, 0, rootParentId, projectId));

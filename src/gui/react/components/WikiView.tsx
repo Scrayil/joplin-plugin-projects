@@ -90,7 +90,10 @@ const TocLevel: React.FC<{
                                         }}
                                     >
                                         <span style={{ marginRight: '6px', width: '14px', flexShrink: 0, textAlign: 'center' }}>
-                                            {node.type === 'folder' ? '📂' : '•'}
+                                            {node.type === 'folder' 
+                                                ? (level === 0 ? '◆' : '▼') 
+                                                : '•'
+                                            }
                                         </span>
                                         <span>{node.title}</span>
                                     </div>

@@ -150,3 +150,13 @@ export function isValidWikiStructure(data: any): data is WikiNode {
 
     return true;
 }
+
+/**
+ * Sanitizes a title for sorting by removing ALL leading non-alphanumeric characters
+ * (emojis, symbols, whitespace, brackets, etc.).
+ */
+export function sanitizeTitle(title: string): string {
+    if (!title) return '';
+    // Remove everything at the start that is NOT a letter or a number
+    return title.replace(/^[^\p{L}\p{N}]+/u, '');
+}

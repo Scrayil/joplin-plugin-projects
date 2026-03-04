@@ -82,7 +82,7 @@ export class TaskDashboard {
                     return await this.toggleSubTask(message.payload);
                 }
                 
-                if (['openNote', 'toggleSideBar', 'toggleNoteList', 'synchronize', 'toggleMenuBar'].includes(message.name)) {
+                if (['openNote', 'toggleSideBar', 'toggleNoteList', 'synchronize', 'toggleMenuBar', 'resetLayout'].includes(message.name)) {
                      const commandArgs = message.payload?.taskId ? [message.payload.taskId] : [];
                      await joplin.commands.execute(message.name, ...commandArgs);
                      return;

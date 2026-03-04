@@ -1,19 +1,17 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-name: GitHub Prerelease Pipeline
+name: NPM Stable Release Pipeline
 
 on:
   push:
     tags:
-      - 'v*-alpha*'
-      - 'v*-preview*'
-      - 'v*-beta*'
-      - 'v*-rc*'
-
-permissions:
-  contents: write
+      - 'v*.*.*'
+      - '!v*-alpha*'
+      - '!v*-preview*'
+      - '!v*-beta*'
+      - '!v*-rc*'
 
 jobs:
-  publish-prerelease:
+  publish-npm:
     runs-on: ubuntu-latest
 
     steps:
@@ -33,13 +31,12 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          registry-url: 'https://registry.npmjs.org/'
 
       - run: npm ci
 
       - run: npm run dist
 
-      - uses: softprops/action-gh-release@v2
-        with:
-          prerelease: true
-          generate_release_notes: true
-          files: publish/*.jpl
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

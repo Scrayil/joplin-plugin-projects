@@ -44,6 +44,7 @@ export interface WikiNode {
     title: string;
     type: 'folder' | 'note';
     level: number;
+    parentId: string;
     body: string;
     is_todo?: boolean;
     todo_completed?: number;

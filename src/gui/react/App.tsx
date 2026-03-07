@@ -144,19 +144,19 @@ const App: React.FC = () => {
         }
     };
 
-    const handleToggleLayout = async (type: 'sideBar' | 'noteList' | 'menuBar') => {
+    const handleToggleLayout = async (type: 'sideBar' | 'noteList' | 'menuBar' | 'reset') => {
         try {
             let messageName = '';
             if (type === 'sideBar') messageName = 'toggleSideBar';
             else if (type === 'noteList') messageName = 'toggleNoteList';
             else if (type === 'menuBar') messageName = 'toggleMenuBar';
-            
+            else if (type === 'reset') messageName = 'resetLayout';
+
             await window.webviewApi.postMessage({ name: messageName });
         } catch (error) {
-            console.error(`Error toggling ${type}:`, error);
+            console.error(`Error handling layout ${type}:`, error);
         }
     };
-
     const handleUpdateStatus = async (taskId: string, newStatus: string) => {
         const updatedTasks = data.tasks.map(t => {
             if (t.id === taskId) {
@@ -297,6 +297,13 @@ const App: React.FC = () => {
                             title="Toggle Menu Bar"
                         >
                             🛠️
+                        </button>
+                        <button 
+                            className="layout-btn"
+                            onClick={() => handleToggleLayout('reset')}
+                            title="Reset Layout"
+                        >
+                            🧹
                         </button>
                     </div>
                 </div>

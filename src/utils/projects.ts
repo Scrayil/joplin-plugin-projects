@@ -6,7 +6,8 @@ import {
     writeFileContent,
     getPluginDataFolder, 
     getSettingValue, 
-    isValidWikiStructure
+    isValidWikiStructure,
+    sanitizeTitle
 } from "./utils";
 import * as path from "node:path";
 import { 
@@ -317,6 +318,9 @@ export async function getAllProjects() {
     // Fetch all folders using helper
     const folders = await fetchAllItems(['folders'], { fields: ['id', 'parent_id', 'title'] });
 
-    // Filter direct children of root
-    return folders.filter((f: any) => f.parent_id === rootId).map((p: any) => ({ id: p.id, name: p.title }));
+    // Filter direct children of root and sort alphabetically (ignoring emojis)
+    return folders
+        .filter((f: any) => f.parent_id === rootId)
+        .sort((a, b) => sanitizeTitle(a.title).localeCompare(sanitizeTitle(b.title), undefined, { sensitivity: 'accent' }))
+        .map((p: any) => ({ id: p.id, name: p.title }));
 }

@@ -337,6 +337,7 @@ const App: React.FC = () => {
                 {activeTab === 'wiki' && <WikiView 
                     projectId={projectFilter}
                     onOpenNote={handleOpenNote}
+                    onToggleSubTask={handleToggleSubTask}
                     lastUpdated={lastUpdated}
                 />}
                 {activeTab === 'info' && <InfoView />}

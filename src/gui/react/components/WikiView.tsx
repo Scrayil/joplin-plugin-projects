@@ -7,9 +7,32 @@ import taskLists from 'markdown-it-task-lists';
 import DOMPurify from 'dompurify';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
+
+/**
+ * Instantiates and configures the Markdown parser with extended protocol support.
+ * * @returns {MarkdownIt} The configured MarkdownIt instance.
+ */
+const getConfiguredMdParser = (): MarkdownIt => {
+    const md = new MarkdownIt({
+        html: true,
+        linkify: true,
+        typographer: true
+    }).use(taskLists, { enabled: true });
+
+    md.validateLink = (url: string): boolean => {
+        const VALID_URI_REGEX = /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp|file):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
+        return VALID_URI_REGEX.test(url.trim());
+    };
+
+    return md;
+};
+
+const mdParser = getConfiguredMdParser();
+
 interface WikiViewProps {
     projectId: string;
     onOpenNote: (noteId: string) => void;
+    onToggleSubTask?: (taskId: string, subTaskIndex: number, checked: boolean) => void;
     lastUpdated: number;
 }
 
@@ -135,7 +158,7 @@ const TocLevel: React.FC<{
     );
 };
 
-const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated }) => {
+const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubTask, lastUpdated }) => {
     const [wikiData, setWikiData] = useState<WikiNode[]>([]);
     const [loading, setLoading] = useState(true);
     const [isTocOpen, setIsTocOpen] = useState(() => {
@@ -145,7 +168,6 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated 
 
     const [activeMedia, setActiveMedia] = useState<{ url: string; type: 'video' | 'audio'; name: string } | null>(null);
     const contentRef = useRef<HTMLDivElement>(null);
-    const mdParser = useRef(new MarkdownIt({ html: true, linkify: true, typographer: true }).use(taskLists));
 
     const wikiTree = useMemo(() => buildTree(wikiData), [wikiData]);
     
@@ -244,7 +266,7 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated 
             contentRef.current?.querySelectorAll('.markdown-content').forEach(el => {
                 const markdown = el.getAttribute('data-markdown');
                 if (markdown) {
-                    const cleanHtml = DOMPurify.sanitize(mdParser.current.render(markdown), {
+                    const cleanHtml = DOMPurify.sanitize(mdParser.render(markdown), {
                         ADD_URI_SAFE_ATTR: ['href', 'src'],
                         ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp|file):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
                     });
@@ -275,6 +297,25 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated 
                 }
             }
         }
+
+        if (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'checkbox') {
+            const checkbox = target as HTMLInputElement;
+            const noteContainer = target.closest('[id^="wiki-section-"]');
+            const markdownContent = target.closest('.markdown-content');
+            
+            if (noteContainer && markdownContent) {
+                const noteId = noteContainer.id.replace('wiki-section-', '');
+                const checkboxes = Array.from(markdownContent.querySelectorAll('input[type="checkbox"]'));
+                const subTaskIndex = checkboxes.indexOf(checkbox);
+                
+                if (subTaskIndex !== -1 && onToggleSubTask) {
+                    // Note: Prevent default behavior because we handle the check state in backend 
+                    // and wait for the update to trickle back through Joplin's watcher.
+                    // However, we can also let it happen for visual immediate feedback.
+                    onToggleSubTask(noteId, subTaskIndex, checkbox.checked);
+                }
+            }
+        }
     };
 
     if (loading) return <div style={{ padding: '40px', opacity: 0.6, textAlign: 'center' }}>Loading documentation...</div>;
@@ -287,6 +328,11 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated 
                 .toc-sidebar::-webkit-scrollbar, .wiki-reader-content::-webkit-scrollbar { height: 4px; width: 4px; }
                 .toc-sidebar::-webkit-scrollbar-thumb, .wiki-reader-content::-webkit-scrollbar-thumb { background: var(--joplin-divider-color); border-radius: 4px; }
                 
+                .markdown-body a {
+                    color: var(--joplin-color) !important;
+                    text-decoration: underline;
+                }
+
                 /* Adaptive Drop Hint Variables */
                 :root {
                     --drop-hint-bg: rgba(255, 255, 255, 0.15);

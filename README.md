@@ -17,7 +17,7 @@ An advanced project management plugin for Joplin that transforms your notes into
 - **Interactive Dashboard**: A central hub to visualize and interact with all your tasks from every project.
 - **Urgency Filter**: A dedicated toggle (🚨) to instantly filter the view and show only Overdue or Approaching tasks.
 - **Smart Task Recognition**: Any to-do note inside a project's dedicated "Tasks" folder is automatically picked up by the dashboard.
-- **Sub-task Management**: Create and toggle sub-tasks (markdown checkboxes) directly from the Kanban board or edit dialog.
+- **Sub-task Management**: Create, nest, and toggle sub-tasks (markdown checkboxes) using a collapsible tree view directly from the Kanban board or edit dialog. Includes a dedicated Fullscreen mode for managing complex hierarchies.
 - **Seamless Integration**: Uses Joplin's native to-dos, tags, and folders. Your data remains in the standard Joplin format.
 - **Automatic Sync**: The dashboard stays in sync with your notes in real-time.
 
@@ -62,7 +62,8 @@ The dashboard is the heart of the plugin and provides several ways to look at yo
 - **Interactions**:
   - **Double-Click**: Opens an edit dialog to change priority, due date, and sub-tasks.
   - **Right-Click**: Opens a context menu to Edit, Open Note, or Delete.
-  - **Check Sub-tasks**: Toggle sub-tasks directly from the card.
+  - **Check Sub-tasks**: Expand, collapse, and toggle nested sub-tasks directly from the card.
+  - **Fullscreen Subtasks**: Open subtasks in a large overlay for easier management of deep hierarchies.
 
 #### Timeline View
 - **Visualize Deadlines**: See tasks plotted on a timeline based on their creation date and due date. A red line indicates the current day.

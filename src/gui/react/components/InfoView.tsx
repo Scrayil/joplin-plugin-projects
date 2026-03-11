@@ -86,7 +86,7 @@ const InfoView: React.FC = () => {
                 <h3 style={{ color: 'var(--text-color)', fontSize: '1.4rem' }}>🖱️ Interactions</h3>
                 <ul style={{ paddingLeft: '25px' }}>
                     <li style={{ marginBottom: '12px' }}><strong>Double Click:</strong> Opens the <strong>Edit Task</strong> dialog to modify deadlines, priority, or sub-tasks.</li>
-                    <li style={{ marginBottom: '12px' }}><strong>Right Click:</strong> Opens a <strong>Context Menu</strong> with options to Edit (GUI), Edit Text (Note), or Delete the task.</li>
+                    <li style={{ marginBottom: '12px' }}><strong>Right Click:</strong> Opens a <strong>Context Menu</strong> with options to Edit (GUI), Edit Text (Note), Delete the task, or Expand Subtasks.</li>
                     <li style={{ marginBottom: '12px' }}><strong>(+) Button:</strong> Opens the <strong>New Task</strong> dialog. You can also create new projects directly from there.</li>
                     <li style={{ marginBottom: '12px' }}><strong>(🚨) Urgent Toggle:</strong> Filters the view to show <strong>ONLY</strong> tasks that are Overdue or Approaching a deadline.</li>
                     <li style={{ marginBottom: '12px' }}><strong>Project Filter:</strong> Use the dropdown in the header to focus on a specific project or view "All Tasks".</li>
@@ -95,7 +95,7 @@ const InfoView: React.FC = () => {
 
             <section style={{ marginBottom: '30px' }}>
                 <h3 style={{ color: 'var(--text-color)', fontSize: '1.4rem' }}>🏗️ Advanced Sub-tasks</h3>
-                <p>Manage complex tasks with 6-level nested hierarchies directly from the Task Dialog or Kanban cards.</p>
+                <p>Manage complex tasks with 6-level nested hierarchies directly from the Task Dialog or Kanban cards using a collapsible tree view. You can also open subtasks in a Fullscreen Overlay (⤢) for easier management of large lists.</p>
                 
                 <h4 style={{ marginTop: '15px', color: 'var(--text-color)', fontSize: '1.1rem' }}>Hierarchical Drag & Drop:</h4>
                 <p style={{ marginBottom: '10px', opacity: 0.9 }}>Use the drag handles (<span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>⋮⋮</span>) to easily grab and move items.</p>

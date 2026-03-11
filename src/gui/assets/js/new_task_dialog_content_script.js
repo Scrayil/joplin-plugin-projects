@@ -28,6 +28,75 @@
     const dateInput = document.getElementById('taskDueDate');
     const btnAddNewProject = document.getElementById('btnAddNewProject');
 
+    // -- Fullscreen Subtasks --
+    const subtaskContainer = document.querySelector('.form-group:has(#subTaskList)');
+    const btnExpand = document.createElement('button');
+    btnExpand.type = 'button';
+    btnExpand.title = 'Expand Subtasks';
+    btnExpand.innerHTML = '⤢';
+    btnExpand.className = 'subtasks-expand-btn';
+    btnExpand.style.cssText = 'background: var(--joplin-background-color-hover3); border: 1px solid var(--joplin-divider-color); color: var(--joplin-color); border-radius: 4px; cursor: pointer; font-size: 1rem; opacity: 0.8; padding: 2px 6px; line-height: 1; margin-left: auto;';
+    
+    const headerWrapper = document.createElement('div');
+    headerWrapper.style.display = 'flex';
+    headerWrapper.style.justifyContent = 'space-between';
+    headerWrapper.style.alignItems = 'center';
+    headerWrapper.style.marginBottom = '5px';
+    
+    // Find the label for Sub-tasks
+    const label = subtaskContainer.querySelector('label');
+    subtaskContainer.insertBefore(headerWrapper, label);
+    headerWrapper.appendChild(label);
+    headerWrapper.appendChild(btnExpand);
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'subtasks-expanded-backdrop';
+    backdrop.style.display = 'none';
+    const dialogRoot = document.querySelector('.dialog-root');
+    if (dialogRoot) {
+        dialogRoot.appendChild(backdrop);
+    } else {
+        document.body.appendChild(backdrop);
+    }
+
+    const expandedHeader = document.createElement('div');
+    expandedHeader.className = 'subtasks-expanded-header';
+    expandedHeader.style.display = 'none';
+    expandedHeader.innerHTML = '<h3>Subtasks</h3><button type="button" class="subtasks-close-btn">&times;</button>';
+    subtaskContainer.insertBefore(expandedHeader, subtaskContainer.firstChild);
+
+    const closeBtn = expandedHeader.querySelector('.subtasks-close-btn');
+
+    function toggleExpand() {
+        const dialogRoot = document.querySelector('.dialog-root');
+        const isExpanded = subtaskContainer.classList.contains('subtasks-expanded-overlay');
+        if (isExpanded) {
+            subtaskContainer.classList.remove('subtasks-expanded-overlay');
+            backdrop.style.display = 'none';
+            expandedHeader.style.display = 'none';
+            headerWrapper.style.display = 'flex';
+            list.classList.remove('expanded');
+            list.style.maxHeight = '226px';
+            list.style.flex = 'none';
+            if (dialogRoot) dialogRoot.classList.remove('expanded-mode');
+        } else {
+            subtaskContainer.classList.add('subtasks-expanded-overlay');
+            backdrop.style.display = 'block';
+            expandedHeader.style.display = 'flex';
+            headerWrapper.style.display = 'none';
+            list.classList.add('expanded');
+            list.style.maxHeight = 'none';
+            list.style.flex = '1';
+            if (dialogRoot) dialogRoot.classList.add('expanded-mode');
+        }
+        renderList();
+    }
+
+    btnExpand.addEventListener('click', toggleExpand);
+    closeBtn.addEventListener('click', toggleExpand);
+    backdrop.addEventListener('click', toggleExpand);
+
+
     // -- Helpers --
     
     /**
@@ -315,7 +384,7 @@
 
     /**
      * Renders the subtask list DOM elements.
-     * Applies indentation styles, drag handles, and event listeners.
+     * Builds a hierarchical tree using <details> and <summary> for expandable cards.
      */
     function renderList() {
         // Ensure hierarchy is valid before rendering
@@ -323,66 +392,147 @@
 
         list.innerHTML = '';
         
-        const minRows = 5;
-        const totalRows = Math.max(subTasks.length, minRows);
+        // Build Tree from flat array
+        const tree = [];
+        const stack = [];
 
-        for (let i = 0; i < totalRows; i++) {
-            const li = document.createElement('li');
-            
-            if (i < subTasks.length) {
-                // -- Render Real Task --
-                const task = subTasks[i];
-                li.className = 'subtask-item';
-                li.dataset.index = i;
-                li.draggable = true;
-
-                // CSS Variables for indent/lines
-                li.style.setProperty('--level', task.level);
-                if (task.level > 0) {
-                    li.style.setProperty('--has-parent', 'block');
-                }
-
-                // Drag Handle
-                const dragHandle = document.createElement('span');
-                dragHandle.className = 'drag-handle';
-                dragHandle.textContent = '⋮⋮';
-                li.appendChild(dragHandle);
-
-                // Indentation Guide (Hyphens) - Placed AFTER handle
-                if (task.level > 0) {
-                    const indent = document.createElement('span');
-                    indent.className = 'indent-guide';
-                    indent.textContent = '-'.repeat(task.level);
-                    li.appendChild(indent);
-                }
-
-                // Text with Tooltip
-                const span = document.createElement('span');
-                span.textContent = task.title;
-                span.title = task.title;
-                span.style.flex = '1';
-                li.appendChild(span);
-
-                // Remove Button
-                const btnRemove = document.createElement('button');
-                btnRemove.type = 'button';
-                btnRemove.className = 'btn-remove';
-                btnRemove.textContent = '×';
-                btnRemove.dataset.index = i;
-                li.appendChild(btnRemove);
-
-                // Events
-                li.addEventListener('dragstart', handleDragStart);
-                li.addEventListener('dragover', handleDragOver);
-                li.addEventListener('dragend', handleDragEnd);
-                li.addEventListener('drop', handleDrop);
+        subTasks.forEach((t, i) => {
+            const node = { ...t, index: i, children: [] };
+            while (stack.length > 0 && stack[stack.length - 1].level >= t.level) {
+                stack.pop();
+            }
+            if (stack.length > 0) {
+                stack[stack.length - 1].node.children.push(node);
             } else {
-                // -- Render Empty Row (Placeholder) --
-                li.className = 'subtask-item empty';
-                // No content, just visual lines
+                tree.push(node);
+            }
+            stack.push({ node, level: t.level });
+        });
+
+        function createNodeElements(node) {
+            const hasChildren = node.children.length > 0;
+            
+            const container = document.createElement('li');
+            container.className = 'subtask-node-container';
+            container.style.listStyle = 'none';
+            
+            // The droppable/draggable target
+            const dropTarget = document.createElement('div');
+            dropTarget.className = 'subtask-item';
+            dropTarget.dataset.index = node.index;
+            dropTarget.draggable = true;
+
+            // Drag Handle
+            const dragHandle = document.createElement('span');
+            dragHandle.className = 'drag-handle';
+            dragHandle.textContent = '⋮⋮';
+            dropTarget.appendChild(dragHandle);
+
+            // Title
+            const span = document.createElement('span');
+            span.textContent = node.title;
+            span.title = node.title;
+            span.style.flex = '1';
+            dropTarget.appendChild(span);
+
+            // Remove Button
+            const btnRemove = document.createElement('button');
+            btnRemove.type = 'button';
+            btnRemove.className = 'btn-remove';
+            btnRemove.textContent = '×';
+            btnRemove.dataset.index = node.index;
+            dropTarget.appendChild(btnRemove);
+
+            // Events on dropTarget
+            dropTarget.addEventListener('dragstart', handleDragStart);
+            dropTarget.addEventListener('dragover', handleDragOver);
+            dropTarget.addEventListener('dragend', handleDragEnd);
+            dropTarget.addEventListener('drop', handleDrop);
+
+            if (hasChildren) {
+                const details = document.createElement('details');
+                details.open = true;
+                details.className = 'subtask-details-card';
+                
+                const summary = document.createElement('summary');
+                summary.className = 'subtask-details-summary';
+                
+                // Add chevron
+                const chevron = document.createElement('span');
+                chevron.textContent = '▼';
+                chevron.className = 'subtask-details-chevron';
+                chevron.style.fontSize = '0.7rem';
+                chevron.style.marginRight = '6px';
+                chevron.style.opacity = '0.6';
+                chevron.style.display = 'flex';
+                chevron.style.alignItems = 'center';
+                chevron.style.justifyContent = 'center';
+                chevron.style.width = '12px';
+                summary.appendChild(chevron);
+
+                summary.appendChild(dropTarget);
+                details.appendChild(summary);
+
+                const childrenWrapper = document.createElement('div');
+                childrenWrapper.className = 'subtask-details-body';
+                node.children.forEach(childNode => {
+                    childrenWrapper.appendChild(createNodeElements(childNode));
+                });
+                details.appendChild(childrenWrapper);
+                
+                container.appendChild(details);
+            } else {
+                dropTarget.classList.add('leaf-node');
+                container.appendChild(dropTarget);
             }
 
-            list.appendChild(li);
+            return container;
+        }
+
+        tree.forEach(node => {
+            list.appendChild(createNodeElements(node));
+        });
+        
+        // Add remaining empty rows to maintain a consistent visual height.
+        // Normal view fits exactly 5 rows. Expanded view fits exactly 12 rows.
+        const isExpanded = list.classList.contains('expanded');
+        const targetRows = isExpanded ? 12 : 5;
+        
+        // Count total visible nodes to know how many slots are occupied
+        let visibleCount = 0;
+        function countNodes(nodes) {
+            let count = 0;
+            nodes.forEach(n => {
+                count++;
+                count += countNodes(n.children);
+            });
+            return count;
+        }
+        visibleCount = countNodes(tree);
+
+        const remainingRows = Math.max(0, targetRows - visibleCount);
+        
+        for (let i = 0; i < remainingRows; i++) {
+            const emptyLi = document.createElement('li');
+            emptyLi.className = 'subtask-node-container';
+            emptyLi.style.listStyle = 'none';
+            emptyLi.style.display = 'flex';
+            // emptyLi.style.flex = '1'; // Removed flex: 1 to prevent stretching
+            
+            const emptyItem = document.createElement('div');
+            emptyItem.className = 'subtask-item empty';
+            emptyItem.style.height = '38px'; // Fixed height
+            emptyItem.style.minHeight = '38px';
+            // emptyItem.style.flex = '1'; // Removed flex: 1 to prevent stretching
+            
+            // Add a very subtle horizontal separator line centered in the 4px flex gap.
+            // Using box-shadow with a 2px vertical offset pushes the 1px line exactly in the middle of the 4px gap!
+            if (i < remainingRows - 1 || visibleCount + i < targetRows - 1) {
+                emptyItem.style.boxShadow = '0 2px 0 0 rgba(127, 127, 127, 0.3)';
+            }
+            
+            emptyLi.appendChild(emptyItem);
+            list.appendChild(emptyLi);
         }
 
         serialize();
@@ -409,6 +559,7 @@
 
     list.addEventListener('click', (e) => {
         if (e.target.classList.contains('btn-remove')) {
+            e.preventDefault();
             const index = parseInt(e.target.dataset.index);
             // Remove block (item + children)
             const blockSize = getBlockSize(index);

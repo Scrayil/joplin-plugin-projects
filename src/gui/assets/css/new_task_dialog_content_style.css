@@ -17,21 +17,27 @@ body {
 
 .dialog-root {
     background-color: var(--joplin-background-color);
-    border: 1px solid rgba(127, 127, 127, 0.5);
+    border: 1px solid var(--joplin-divider-color);
     border-radius: 8px;
     padding: 20px;
     width: 550px;
-    min-height: 550px;
+    min-height: 580px;
     position: relative;
     display: flex;
     flex-direction: column;
     box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    transition: all 0.2s ease-in-out;
+}
+
+.dialog-root.expanded-mode {
+    width: 900px;
+    height: 700px;
 }
 
 h1 {
     font-size: 1.2rem;
     margin-top: 0;
-    border-bottom: 1px solid rgba(127, 127, 127, 0.5);
+    border-bottom: 1px solid var(--joplin-divider-color);
     padding-bottom: 10px;
     margin-bottom: 20px;
 }
@@ -56,7 +62,7 @@ textarea {
     width: 100%;
     padding: 8px;
     background: var(--joplin-background-color);
-    border: 1px solid rgba(127, 127, 127, 0.5);
+    border: 1px solid var(--joplin-divider-color);
     color: var(--joplin-color);
     border-radius: 4px;
     box-sizing: border-box;
@@ -96,9 +102,9 @@ select:disabled {
 
 .btn-inline-add {
     padding: 0 15px;
-    background: rgba(127, 127, 127, 0.05);
+    background: var(--joplin-background-color-hover3);
     color: var(--joplin-color);
-    border: 1px solid rgba(127, 127, 127, 0.5);
+    border: 1px solid var(--joplin-divider-color);
     border-radius: 4px;
     cursor: pointer;
     font-weight: bold;
@@ -107,7 +113,8 @@ select:disabled {
 }
 
 .btn-inline-add:hover {
-    background: rgba(127, 127, 127, 0.15);
+    background: var(--joplin-background-color-hover3);
+    opacity: 0.8;
 }
 
 /* Subtasks dynamic UI */
@@ -120,30 +127,91 @@ select:disabled {
 
 .subtask-list {
     list-style: none;
-    padding: 0;
+    padding: 6px;
     margin: 0;
-    max-height: 212px;
+    max-height: 226px;
     overflow-y: auto;
     overflow-x: hidden;
-    background: rgba(127, 127, 127, 0.05); /* Neutral background */
+    background: transparent;
     border-radius: 4px;
-    border: 1px solid rgba(127, 127, 127, 0.5);
-    display: block;
+    border: 1px solid var(--joplin-divider-color);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.subtask-list.expanded {
+    max-height: 100%;
+    flex: 1;
+}
+
+.subtask-node-container {
+    list-style: none;
+    margin: 0;
+}
+
+.subtask-details-card {
+    background: transparent;
+    border: 1px solid var(--joplin-divider-color);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 2px;
+}
+
+.subtask-details-summary {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    background: color-mix(in srgb, var(--joplin-background-color-hover3) 40%, transparent);
+    border-bottom: 1px solid var(--joplin-divider-color);
+    font-weight: bold;
+    user-select: none;
+    padding-left: 8px;
+    list-style: none; /* Hide default marker */
+}
+
+.subtask-details-summary::-webkit-details-marker {
+    display: none; /* Hide default marker in WebKit */
+}
+
+.subtask-details-chevron {
+    transition: transform 0.2s ease-in-out;
+}
+
+.subtask-details-card[open] > .subtask-details-summary .subtask-details-chevron {
+    transform: rotate(180deg);
+}
+
+.subtask-details-card[open] .subtask-details-summary {
+    border-bottom: 1px solid var(--joplin-divider-color);
+}
+
+.subtask-details-card:not([open]) .subtask-details-summary {
+    border-bottom: none;
+}
+
+.subtask-details-body {
+    padding: 6px 8px 6px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 .subtask-item {
     position: relative;
     display: flex;
     align-items: center;
-    padding: 8px 12px;
-    border-bottom: 1px solid rgba(127, 127, 127, 0.5);
-    min-height: 42px;
+    padding: 6px 8px;
+    min-height: 38px;
     cursor: grab;
     transition: background-color 0.2s;
+    width: 100%;
+    border-radius: 4px;
 }
 
-.subtask-item:last-child {
-    border-bottom: none;
+.subtask-item.leaf-node {
+    background: transparent;
+    border: 1px solid var(--joplin-divider-color);
 }
 
 .subtask-item.empty {
@@ -152,13 +220,14 @@ select:disabled {
     user-select: none;
     pointer-events: none;
     cursor: default;
+    background: transparent;
 }
 
 .btn-add {
     padding: 0 15px;
-    background: rgba(127, 127, 127, 0.05);
+    background: var(--joplin-background-color-hover3);
     color: var(--joplin-color);
-    border: 1px solid rgba(127, 127, 127, 0.5);
+    border: 1px solid var(--joplin-divider-color);
     border-radius: 4px;
     cursor: pointer;
     font-weight: bold;
@@ -166,18 +235,19 @@ select:disabled {
 }
 
 .btn-add:hover {
-    background: rgba(127, 127, 127, 0.15);
+    background: var(--joplin-background-color-hover3);
+    opacity: 0.8;
 }
 
 .btn-remove {
     background: none;
     border: none;
-    color: #ff4757; /* Standard delete red, works on both modes usually */
+    color: #ff4757;
     cursor: pointer;
     font-weight: bold;
     font-size: 1.1rem;
     visibility: hidden;
-    margin-left: auto; /* Push to right */
+    margin-left: auto;
 }
 
 .subtask-item:not(.empty) .btn-remove {
@@ -193,8 +263,67 @@ select:disabled {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(127, 127, 127, 0.5);
+    background: var(--joplin-divider-color);
     border-radius: 4px;
+}
+
+/* Subtask Fullscreen Overlay for Dialogs */
+.subtasks-expanded-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 9999;
+    backdrop-filter: blur(2px);
+    border-radius: 8px;
+}
+
+.subtasks-expanded-overlay {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    bottom: 20px;
+    background: var(--joplin-background-color);
+    border: 1px solid var(--joplin-divider-color);
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.subtasks-expanded-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--joplin-divider-color);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.subtasks-expanded-header h3 {
+    margin: 0;
+    font-size: 1.4rem;
+    color: var(--joplin-color);
+}
+
+.subtasks-close-btn {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--joplin-color);
+    opacity: 0.6;
+}
+
+.subtasks-close-btn:hover {
+    opacity: 1;
 }
 
 /* === DRAG & DROP STYLES === */
@@ -213,17 +342,6 @@ select:disabled {
 
 .subtask-item:hover .drag-handle {
     opacity: 0.8;
-}
-
-/* Indentation Guide (Hyphens) - First Element */
-.indent-guide {
-    color: var(--joplin-color);
-    opacity: 0.4;
-    margin-right: 6px; 
-    font-family: monospace;
-    font-weight: bold;
-    user-select: none;
-    flex-shrink: 0;
 }
 
 .subtask-item span {
@@ -245,6 +363,6 @@ select:disabled {
 .subtask-item.drop-nest {
     /* Dashed border + light background for nesting hint */
     border: 1px dashed var(--joplin-color);
-    background-color: rgba(127, 127, 127, 0.1);
+    background-color: var(--joplin-background-color-hover3);
     opacity: 0.9;
 }

@@ -29,6 +29,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
         typographer: true
     }), []);
 
+    const [expandedTask, setExpandedTask] = React.useState<string | null>(null);
+
     /**
      * Filters and sorts tasks for a specific column (status).
      * Sorts by Due Date -> Priority -> Creation Time.
@@ -94,7 +96,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
     const renderTags = (tags: string[]) => {
         if (!tags || tags.length === 0) return null;
         return (
-            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '5px' }}>
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '5px', marginBottom: '8px' }}>
                 {tags.map((tag, i) => {
                     let bg = '#eee';
                     let color = '#333';
@@ -110,80 +112,151 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
 
     /**
      * Renders the list of subtasks for a task card.
-     * Handles nested indentation and checkbox toggling.
+     * Handles nested indentation via expandable <details> cards.
      * @param task The parent task containing subtasks.
      */
     const renderSubTasks = (task: Task) => {
         if (!task.subTasks || task.subTasks.length === 0) return null;
-        return (
-            <div className="task-subtasks-container">
-                {task.subTasks.map((st: any, i) => {
-                    const level = st.level || 0;
-                    
-                    return (
-                        <div key={i} style={{ 
-                            display: 'flex', 
-                            alignItems: 'flex-start', // Align to top for multi-line text
-                            gap: '6px', 
-                            fontSize: '0.9rem', 
-                            marginBottom: '4px'
-                        }}>
-                            {/* Indentation Hyphens placed BEFORE the checkbox */}
-                            {level > 0 && (
-                                <span style={{
-                                    color: 'var(--joplin-divider-color)',
-                                    fontFamily: 'monospace',
-                                    fontWeight: 'bold',
-                                    userSelect: 'none',
-                                    marginRight: '2px',
-                                    flexShrink: 0,
-                                    marginTop: '3px' // Visual alignment with first line of text
-                                }}>
-                                    {'-'.repeat(level)}
-                                </span>
-                            )}
 
-                            <input 
-                                type="checkbox" 
-                                checked={st.completed} 
-                                onChange={(e) => {
-                                    e.stopPropagation();
-                                    onToggleSubTask(task.id, i, e.target.checked);
-                                }}
-                                style={{ 
-                                    cursor: 'pointer', 
-                                    flexShrink: 0,
-                                    marginTop: '3px' // Visual alignment with first line of text
-                                }}
-                            />
-                            <span 
-                                style={{ 
-                                    textDecoration: st.completed ? 'line-through' : 'none', 
-                                    color: st.completed ? 'var(--joplin-divider-color)' : 'var(--text-color)',
-                                    opacity: st.completed ? 0.6 : 1,
-                                    overflowWrap: 'anywhere',
-                                    lineHeight: '1.4'
-                                }}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    const target = e.target as HTMLElement;
-                                    if (target.tagName === 'A') {
-                                        e.preventDefault();
-                                        const href = (target as HTMLAnchorElement).href;
-                                        window.webviewApi.postMessage({ name: 'openExternal', payload: href });
-                                    }
-                                }}
-                                dangerouslySetInnerHTML={{ 
-                                    __html: DOMPurify.sanitize(mdParser.renderInline(st.title), { 
-                                        ADD_ATTR: ['target'],
-                                        ALLOWED_URI_REGEXP: /^https?:/i 
-                                    }) 
-                                }} 
-                            />
+        // Build a tree from flat subtasks array
+        const tree: any[] = [];
+        const stack: { node: any, level: number }[] = [];
+
+        task.subTasks.forEach((st: any, index: number) => {
+            const node = { ...st, originalIndex: index, children: [] };
+            const level = st.level || 0;
+
+            while (stack.length > 0 && stack[stack.length - 1].level >= level) {
+                stack.pop();
+            }
+
+            if (stack.length > 0) {
+                stack[stack.length - 1].node.children.push(node);
+            } else {
+                tree.push(node);
+            }
+
+            stack.push({ node, level });
+        });
+
+        const renderNode = (node: any) => {
+            const hasChildren = node.children && node.children.length > 0;
+            
+            const content = (
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', flex: 1, padding: '2px 0' }}>
+                    <input 
+                        type="checkbox" 
+                        checked={node.completed} 
+                        onChange={(e) => {
+                            e.stopPropagation();
+                            onToggleSubTask(task.id, node.originalIndex, e.target.checked);
+                        }}
+                        style={{ cursor: 'pointer', flexShrink: 0, marginTop: '3px' }}
+                    />
+                    <span 
+                        style={{ 
+                            textDecoration: node.completed ? 'line-through' : 'none', 
+                            color: 'var(--text-color)',
+                            opacity: node.completed ? 0.6 : 1,
+                            overflowWrap: 'anywhere',
+                            lineHeight: '1.4'
+                        }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const target = e.target as HTMLElement;
+                            if (target.tagName === 'A') {
+                                e.preventDefault();
+                                const href = (target as HTMLAnchorElement).href;
+                                window.webviewApi.postMessage({ name: 'openExternal', payload: href });
+                            }
+                        }}
+                        dangerouslySetInnerHTML={{ 
+                            __html: DOMPurify.sanitize(mdParser.renderInline(node.title), { 
+                                ADD_ATTR: ['target'],
+                                ALLOWED_URI_REGEXP: /^https?:/i 
+                            }) 
+                        }} 
+                    />
+                </div>
+            );
+
+            if (hasChildren) {
+                return (
+                    <details 
+                        key={node.originalIndex} 
+                        open
+                        className="subtask-details-node"
+                        style={{ 
+                            marginBottom: '6px', 
+                            marginTop: '6px',
+                            background: 'transparent', 
+                            border: '1px solid var(--border-color)', 
+                            borderRadius: '6px',
+                            overflow: 'hidden'
+                        }}
+                    >
+                        <summary style={{ 
+                            display: 'flex', 
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                            background: 'color-mix(in srgb, var(--joplin-background-color-hover3) 40%, transparent)', 
+                            padding: '4px 8px',
+                            borderBottom: '1px solid var(--joplin-divider-color)',
+                            fontSize: '0.9rem',
+                            fontWeight: 'bold',
+                            userSelect: 'none'
+                        }}>
+                            <span className="subtask-details-chevron" style={{ 
+                                fontSize: '0.7rem', 
+                                marginRight: '6px', 
+                                opacity: 0.6,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '12px'
+                            }}>
+                                ▼
+                            </span>
+                            {content}
+                        </summary>
+                        <div style={{ padding: '6px 8px' }}>
+                            {node.children.map((child: any) => renderNode(child))}
                         </div>
-                    );
-                })}
-            </div>
+                    </details>
+                );
+            }
+
+            return (
+                <div key={node.originalIndex} style={{ padding: '0 4px', fontSize: '0.9rem' }}>
+                    {content}
+                </div>
+            );
+        };
+
+        const isExpanded = expandedTask === task.id;
+
+        return (
+            <React.Fragment>
+                {isExpanded && (
+                    <div 
+                        className="subtasks-expanded-backdrop" 
+                        onClick={(e) => { e.stopPropagation(); setExpandedTask(null); }}
+                    />
+                )}
+                <div className={`task-subtasks-wrapper ${isExpanded ? 'subtasks-expanded-overlay' : ''}`} style={!isExpanded ? { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' } : {}}>
+                    {isExpanded && (
+                        <div className="subtasks-expanded-header">
+                            <h3>Subtasks for: {task.title}</h3>
+                            <button className="subtasks-close-btn" onClick={(e) => { e.stopPropagation(); setExpandedTask(null); }}>
+                                &times;
+                            </button>
+                        </div>
+                    )}
+                    <div className={`task-subtasks-container ${isExpanded ? 'expanded' : ''}`} style={{ marginTop: (!isExpanded) ? '8px' : '0', overflowY: 'auto', flex: 1, minHeight: 0, maxHeight: '100%' }}>
+                        {tree.map(node => renderNode(node))}
+                    </div>
+                </div>
+            </React.Fragment>
         );
     };
 
@@ -225,7 +298,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
                                                 ref={provided.innerRef}
                                                 {...provided.draggableProps}
                                                 {...provided.dragHandleProps}
-                                                style={{ ...provided.draggableProps.style, cursor: 'pointer' }}
+                                                style={{ ...provided.draggableProps.style, cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
                                                 onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
                                                 onContextMenu={(e) => handleContextMenu(e, task)}
                                                 title={`${task.projectName}\n${task.title}${task.dueDate > 0 ? `\n${isOverdue ? '(Overdue) ' : (isApproaching ? '(Approaching) ' : '')}${formatDate(task.dueDate)}` : ''}`}
@@ -235,8 +308,10 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
                                                     {task.title}
                                                 </div>
                                                 {renderTags(task.tags)}
-                                                {renderSubTasks(task)}
-                                                {task.dueDate > 0 && <div className="task-due">Due: {formatDate(task.dueDate)}</div>}
+                                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                                                    {renderSubTasks(task)}
+                                                </div>
+                                                {task.dueDate > 0 && <div className="task-due" style={{ flexShrink: 0 }}>Due: {formatDate(task.dueDate)}</div>}
                                             </div>
                                         )}
                                     </Draggable>
@@ -265,6 +340,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
                         onGuiEdit={() => onEditTask(contextMenu.task)}
                         onTextEdit={() => onOpenNote(contextMenu.task.id)}
                         onDelete={() => handleDeleteTask(contextMenu.task)}
+                        onExpandSubtasks={
+                            (contextMenu.task.subTasks && contextMenu.task.subTasks.length > 0) 
+                                ? () => setExpandedTask(contextMenu.task.id) 
+                                : undefined
+                        }
                     />
                 )}
             </div>

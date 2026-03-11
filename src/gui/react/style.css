@@ -308,15 +308,25 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     word-break: break-word;
 }
 
+/* Kanban Subtask Base */
+.task-subtasks-wrapper {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden; /* Prevent column stretch */
+    min-height: 0;
+}
+
 .task-subtasks-container {
     overflow-y: auto; /* Scrollable subtasks */
-    overflow-x: auto; /* Allow horizontal scroll for deep nesting */
+    overflow-x: hidden;
     margin-top: 8px;
     padding-right: 4px;
     border-top: 1px solid var(--border-color);
     padding-top: 8px;
     flex: 1; /* Take remaining space */
-    min-height: 0; /* Allow shrinking to trigger scroll */
+    min-height: 0;
+    max-height: 100%;
 }
 
 .task-card.done {
@@ -701,4 +711,97 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .sidebar-toggle:hover {
     background: var(--joplin-background-color-hover3);
     opacity: 1;
+}
+
+/* Subtask Fullscreen Overlay */
+.subtasks-expanded-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 9999;
+    backdrop-filter: blur(2px);
+}
+
+.subtasks-expanded-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90vw;
+    height: 90vh;
+    max-width: 800px;
+    background: var(--joplin-background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    z-index: 10000; /* Over anything else in board */
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.subtasks-expanded-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.subtasks-expanded-header h3 {
+    margin: 0;
+    font-size: 1.4rem;
+    color: var(--joplin-color);
+}
+
+.subtasks-close-btn {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--text-color);
+    opacity: 0.6;
+}
+
+.subtasks-close-btn:hover {
+    opacity: 1;
+}
+
+.task-subtasks-container.expanded {
+    border-top: none;
+    margin-top: 0;
+    padding-right: 10px;
+    font-size: 1.1rem; /* Slightly larger text for readability */
+}
+
+/* Dim the background when overlay is active */
+body:has(.subtasks-expanded-overlay) .kanban-board {
+    pointer-events: none; /* Prevent clicking behind */
+}
+
+body:has(.subtasks-expanded-overlay) .subtasks-expanded-overlay {
+    pointer-events: auto; /* Allow clicking inside */
+}
+
+/* Pseudo-backdrop hack using an overlay wrapper could also be done, 
+   but since it's nested inside the draggable item, fixed positioning works better */
+
+/* Subtask Expandable Custom Arrow */
+.subtask-details-node > summary {
+    list-style: none; /* Hide default marker */
+}
+.subtask-details-node > summary::-webkit-details-marker {
+    display: none; /* Hide default marker in WebKit */
+}
+.subtask-details-chevron {
+    transition: transform 0.2s ease-in-out;
+}
+.subtask-details-node[open] > summary .subtask-details-chevron {
+    transform: rotate(180deg);
 }

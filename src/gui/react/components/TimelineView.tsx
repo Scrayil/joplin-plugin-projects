@@ -47,7 +47,9 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
             const prioA = getPriorityValue(a.tags);
             const prioB = getPriorityValue(b.tags);
             if (prioA !== prioB) return prioA - prioB;
-            return a.createdTime - b.createdTime;
+            const startA = a.startDate || a.createdTime;
+            const startB = b.startDate || b.createdTime;
+            return startA - startB;
         });
 
     const minTime = timelineTasks.length > 0 ? Math.min(...timelineTasks.map(t => t.startDate || t.createdTime), now) : now;

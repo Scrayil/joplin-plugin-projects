@@ -95,6 +95,16 @@ select:disabled {
     flex: 1;
 }
 
+.form-group.third {
+    flex: 1;
+    min-width: 0;
+}
+
+.form-group.third:last-child {
+    flex: 0 0 auto;
+    min-width: 120px;
+}
+
 .project-input-group {
     display: flex;
     gap: 10px;

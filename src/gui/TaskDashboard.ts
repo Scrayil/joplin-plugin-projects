@@ -151,13 +151,22 @@ export class TaskDashboard {
                     let dueDate = dueDateStr ? new Date(dueDateStr).getTime() : 0;
                     if (!Number.isFinite(dueDate)) dueDate = 0;
 
+                    const startDateStr = formData.taskStartDate;
+                    let startDate = startDateStr ? new Date(startDateStr).getTime() : 0;
+                    if (!Number.isFinite(startDate)) startDate = 0;
+
+                    if (startDate > 0 && dueDate > 0 && startDate > dueDate) {
+                         await joplin.views.dialogs.showToast({ message: "Start Date cannot be after Due Date", duration: 3000, type: ToastType.Error });
+                         return;
+                    }
+
                     const subTasksStr = formData.taskSubTasks || "";
                     // Preserve leading indentation for nested tasks, only trim trailing whitespace
                     const subTasks = subTasksStr.split('\n')
                         .map((s: string) => s.replace(/\s+$/, ''))
                         .filter((s: string) => s.trim().length > 0);
 
-                    await this.updateTask(task.id, { subTasks, urgency, dueDate });
+                    await this.updateTask(task.id, { subTasks, urgency, dueDate, startDate });
                 } else if (result.action === 'delete') {
                     await this.handleDeleteTaskWithConfirmation(task);
                 } else if (result.action === 'text_edit') {
@@ -215,6 +224,15 @@ export class TaskDashboard {
             let dueDate = dueDateStr ? new Date(dueDateStr).getTime() : undefined;
             if (dueDate !== undefined && !Number.isFinite(dueDate)) dueDate = undefined;
 
+            const startDateStr = formData.taskStartDate;
+            let startDate = startDateStr ? new Date(startDateStr).getTime() : undefined;
+            if (startDate !== undefined && !Number.isFinite(startDate)) startDate = undefined;
+
+            if (startDate && dueDate && startDate > dueDate) {
+                 await joplin.views.dialogs.showToast({ message: "Start Date cannot be after Due Date", duration: 3000, type: ToastType.Error });
+                 return;
+            }
+
             const subTasksStr = formData.taskSubTasks || "";
             // Process subtasks: Trim RIGHT only to preserve indentation, Filter empty, and Auto-Linkify
             const subTasks = subTasksStr.split('\n')
@@ -229,7 +247,7 @@ export class TaskDashboard {
                     return s.replace(urlRegex, '[$1]($1)');
                 });
 
-            await this.createTask({ title, projectId, subTasks, urgency, dueDate });
+            await this.createTask({ title, projectId, subTasks, urgency, dueDate, startDate });
             await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
         } else {
             await joplin.views.dialogs.showToast({ message: "Task creation canceled", duration: 3000, type: ToastType.Info });
@@ -239,15 +257,26 @@ export class TaskDashboard {
     /**
      * Creates a new task note in the appropriate folder and applies initial tags.
      */
-    private async createTask(payload: { title: string; projectId: string; subTasks?: string[]; urgency?: string; dueDate?: number }) {
+    private async createTask(payload: { title: string; projectId: string; subTasks?: string[]; urgency?: string; dueDate?: number; startDate?: number }) {
         try {
             const tasksFolderId = await this.projectService.getTasksFolderForProject(payload.projectId);
             const body = this.noteParser.createBodyFromSubTasks(payload.subTasks || []);
 
             const note = await createNote(payload.title, body, true, tasksFolderId);
 
+            let updates: any = {};
             if (payload.dueDate) {
-                await updateNote(note.id, { todo_due: payload.dueDate });
+                updates.todo_due = payload.dueDate;
+            }
+
+            if (payload.startDate) {
+                updates.application_data = JSON.stringify({
+                    'joplin-plugin-projects': { startDate: payload.startDate }
+                });
+            }
+
+            if (Object.keys(updates).length > 0) {
+                await updateNote(note.id, updates);
             }
 
             if (payload.urgency && payload.urgency !== Config.TAGS.KEYWORDS.NORMAL) {
@@ -269,15 +298,35 @@ export class TaskDashboard {
     /**
      * Updates an existing task's body (subtasks), due date, and urgency tags.
      */
-    private async updateTask(taskId: string, payload: { subTasks: string[]; urgency: string; dueDate: number }) {
+    private async updateTask(taskId: string, payload: { subTasks: string[]; urgency: string; dueDate: number; startDate?: number }) {
         try {
             // Retrieve existing body to merge updates without data loss
-            const currentNote = await getNote(taskId, ['body']);
+            const currentNote = await getNote(taskId, ['body', 'application_data']);
             const body = this.noteParser.updateNoteBodyWithSubTasks(currentNote.body, payload.subTasks);
             
+            let appData: any = {};
+            if (currentNote.application_data) {
+                try {
+                    appData = JSON.parse(currentNote.application_data);
+                } catch(e) {
+                    console.warn(`TaskDashboard: Failed to parse application_data for note ${taskId}`);
+                }
+            }
+
+            if (!appData['joplin-plugin-projects']) {
+                appData['joplin-plugin-projects'] = {};
+            }
+
+            if (payload.startDate && payload.startDate > 0) {
+                appData['joplin-plugin-projects'].startDate = payload.startDate;
+            } else {
+                delete appData['joplin-plugin-projects'].startDate;
+            }
+
             await updateNote(taskId, { 
                 body: body,
-                todo_due: payload.dueDate
+                todo_due: payload.dueDate,
+                application_data: JSON.stringify(appData)
             });
 
             await this.tagService.updatePriorityTags(taskId, payload.urgency);

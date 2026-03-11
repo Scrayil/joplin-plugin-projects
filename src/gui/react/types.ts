@@ -13,6 +13,7 @@ export interface Task {
     id: string;
     title: string;
     status: 'todo' | 'in_progress' | 'done' | 'overdue';
+    startDate?: number;
     dueDate?: number;
     createdTime: number;
     completedTime?: number;

@@ -104,7 +104,7 @@ export class ProjectService {
 
         for (const folderId of foldersToScan) {
             const notes = await fetchAllItems(['folders', folderId, 'notes'], {
-                fields: ['id', 'updated_time', 'is_todo', 'parent_id', 'title', 'todo_completed', 'todo_due', 'created_time']
+                fields: ['id', 'updated_time', 'is_todo', 'parent_id', 'title', 'todo_completed', 'todo_due', 'created_time', 'application_data']
             });
             const todos = notes.filter((n: any) => n.is_todo);
             validTodosMetadata = validTodosMetadata.concat(todos);
@@ -161,6 +161,18 @@ export class ProjectService {
             const tags = tagsMap.get(n.id) || [];
             const subTasks = this.noteParser.parseSubTasks(n.body);
 
+            let startDate: number | undefined = undefined;
+            if (n.application_data) {
+                try {
+                    const appData = JSON.parse(n.application_data);
+                    if (appData['joplin-plugin-projects'] && appData['joplin-plugin-projects'].startDate) {
+                        startDate = appData['joplin-plugin-projects'].startDate;
+                    }
+                } catch (e) {
+                    console.warn(`ProjectService: Failed to parse application_data for note ${n.id}`, e);
+                }
+            }
+
             let status = 'todo';
             if (n.todo_completed) {
                 status = 'done';
@@ -180,6 +192,7 @@ export class ProjectService {
                 id: n.id,
                 title: n.title,
                 status: status,
+                startDate: startDate,
                 dueDate: n.todo_due,
                 createdTime: n.created_time,
                 completedTime: n.todo_completed,

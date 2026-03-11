@@ -26,6 +26,7 @@
     const list = document.getElementById('subTaskList');
     const hiddenInput = document.getElementById('taskSubTasks');
     const dateInput = document.getElementById('taskDueDate');
+    const startDateInput = document.getElementById('taskStartDate');
     const btnAddNewProject = document.getElementById('btnAddNewProject');
 
     // -- Fullscreen Subtasks --
@@ -188,6 +189,26 @@
     if (dateInput) {
         dateInput.addEventListener('click', () => {
             if (typeof dateInput.showPicker === 'function') dateInput.showPicker();
+        });
+        dateInput.addEventListener('change', () => {
+            if (startDateInput && startDateInput.value && dateInput.value) {
+                if (new Date(startDateInput.value) > new Date(dateInput.value)) {
+                    startDateInput.value = dateInput.value;
+                }
+            }
+        });
+    }
+
+    if (startDateInput) {
+        startDateInput.addEventListener('click', () => {
+            if (typeof startDateInput.showPicker === 'function') startDateInput.showPicker();
+        });
+        startDateInput.addEventListener('change', () => {
+            if (dateInput && dateInput.value && startDateInput.value) {
+                if (new Date(startDateInput.value) > new Date(dateInput.value)) {
+                    dateInput.value = startDateInput.value;
+                }
+            }
         });
     }
 

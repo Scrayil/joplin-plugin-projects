@@ -159,11 +159,19 @@ export async function editTaskDialog(task: any) {
     html = html.replace('<button type="button" id="btnAddNewProject" class="btn-inline-add" title="Create new project">+</button>', '');
 
     // Pre-fill Due Date
-    if (task.dueDate > 0) {
+    if (task.dueDate && task.dueDate > 0) {
         const date = new Date(task.dueDate);
         // Format to YYYY-MM-DDTHH:mm for datetime-local
         const isoStr = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
         html = html.replace('id="taskDueDate" name="taskDueDate"', `id="taskDueDate" name="taskDueDate" value="${isoStr}"`);
+    }
+
+    // Pre-fill Start Date
+    if (task.startDate && task.startDate > 0) {
+        const date = new Date(task.startDate);
+        // Format to YYYY-MM-DDTHH:mm for datetime-local
+        const isoStr = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+        html = html.replace('id="taskStartDate" name="taskStartDate"', `id="taskStartDate" name="taskStartDate" value="${isoStr}"`);
     }
 
     // Pre-fill Urgency

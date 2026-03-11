@@ -8,9 +8,10 @@ interface TaskContextMenuProps {
     onGuiEdit: () => void;
     onTextEdit: () => void;
     onDelete: () => void;
+    onExpandSubtasks?: () => void;
 }
 
-const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ x, y, onClose, onGuiEdit, onTextEdit, onDelete }) => {
+const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ x, y, onClose, onGuiEdit, onTextEdit, onDelete, onExpandSubtasks }) => {
     const menuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -53,6 +54,19 @@ const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ x, y, onClose, onGuiE
 
     return (
         <div ref={menuRef} style={style} className="context-menu">
+            {onExpandSubtasks && (
+                <>
+                    <button 
+                        style={itemStyle} 
+                        onClick={(e) => { e.stopPropagation(); onExpandSubtasks(); onClose(); }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--joplin-background-color-hover3)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                        ⤢ Expand Subtasks
+                    </button>
+                    <div style={{ borderTop: '1px solid var(--joplin-divider-color)', margin: '5px 0' }}></div>
+                </>
+            )}
             <button 
                 style={itemStyle} 
                 onClick={(e) => { e.stopPropagation(); onGuiEdit(); onClose(); }}

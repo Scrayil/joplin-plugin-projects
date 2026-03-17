@@ -162,7 +162,7 @@ export class ProjectService {
             const subTasks = this.noteParser.parseSubTasks(n.body);
 
             let startDate: number | undefined = undefined;
-            let dependsOn: string[] | undefined = undefined;
+            let dependsOn: { id: string, type: 'FS'|'SS'|'FF'|'SF' }[] | undefined = undefined;
             if (n.application_data) {
                 try {
                     const appData = JSON.parse(n.application_data);

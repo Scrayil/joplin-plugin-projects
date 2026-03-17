@@ -114,7 +114,6 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
 
     const handleCreateDependency = (sourceId: string, sourceType: 'start'|'end', targetId: string, targetType: 'start'|'end') => {
         if (sourceId === targetId) return;
-        if (sourceType === targetType) return; // Must connect start->end or end->start
         
         const targetTask = tasks.find(t => t.id === targetId);
         const sourceTask = tasks.find(t => t.id === sourceId);
@@ -122,20 +121,64 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
         
         if (targetTask.projectId !== sourceTask.projectId) return; // Must be same project
         
-        // For simplicity in the data model, we'll store the 'dependsOn' in the later task, 
-        // pointing to the earlier task.
-        // If an End is dragged to a Start, the Start task depends on the End task.
-        const dependeeId = sourceType === 'end' ? sourceId : targetId;
-        const dependentId = sourceType === 'end' ? targetId : sourceId;
+        // Determine the dependency type based on the handles used.
+        // Format: [Source Handle] to [Target Handle]
+        let type: 'FS'|'SS'|'FF'|'SF' = 'FS';
+        if (sourceType === 'end' && targetType === 'start') type = 'FS';
+        if (sourceType === 'start' && targetType === 'start') type = 'SS';
+        if (sourceType === 'end' && targetType === 'end') type = 'FF';
+        if (sourceType === 'start' && targetType === 'end') type = 'SF';
+
+        // For structural simplicity, the target task ALWAYS holds the dependency array pointing to the source task.
+        const dependentId = targetId;
+        const dependeeId = sourceId;
         
+        // ---------------------------------------------------------
+        // Circular Dependency Check (BFS/DFS)
+        // We must ensure that adding 'dependeeId' as a requirement for 'dependentId'
+        // does not create a cycle. i.e., Does 'dependeeId' already depend on 'dependentId' 
+        // through some chain?
+        // ---------------------------------------------------------
+        const hasCircularDependency = (startNodeId: string, targetNodeId: string): boolean => {
+            const visited = new Set<string>();
+            const queue = [startNodeId];
+            
+            while (queue.length > 0) {
+                const currentId = queue.shift()!;
+                if (currentId === targetNodeId) return true; // Cycle detected
+                
+                if (!visited.has(currentId)) {
+                    visited.add(currentId);
+                    const currentTask = tasks.find(t => t.id === currentId);
+                    if (currentTask && currentTask.dependsOn) {
+                        for (const dep of currentTask.dependsOn) {
+                            queue.push(dep.id);
+                        }
+                    }
+                }
+            }
+            return false;
+        };
+
+        // If the task we want to depend on (dependeeId) already depends on US (dependentId)
+        // or any of our children, it's a circular loop.
+        if (hasCircularDependency(dependeeId, dependentId)) {
+            // Can't use joplin dialog directly here easily, but we can prevent it.
+            console.warn("Circular dependency detected. Action blocked.");
+            // In a full implementation, we'd trigger a toast notification here
+            return;
+        }
+
         const dependentTask = tasks.find(t => t.id === dependentId);
         if (!dependentTask) return;
 
         const currentDeps = dependentTask.dependsOn || [];
-        if (!currentDeps.includes(dependeeId)) {
+        
+        // Prevent duplicate dependencies between the same two tasks
+        if (!currentDeps.some(d => d.id === dependeeId)) {
             window.webviewApi.postMessage({ 
                 name: 'updateTaskDependencies', 
-                payload: { taskId: dependentId, dependsOn: [...currentDeps, dependeeId] } 
+                payload: { taskId: dependentId, dependsOn: [...currentDeps, { id: dependeeId, type }] } 
             });
         }
     };
@@ -405,37 +448,47 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                         </defs>
                         {timelineTasks.map((task, targetIndex) => {
                             if (!task.dependsOn || task.dependsOn.length === 0) return null;
-                            return task.dependsOn.map(depId => {
-                                const sourceIndex = timelineTasks.findIndex(t => t.id === depId);
+                            return task.dependsOn.map(dep => {
+                                const sourceIndex = timelineTasks.findIndex(t => t.id === dep.id);
                                 if (sourceIndex === -1) return null;
                                 
                                 const sourceTask = timelineTasks[sourceIndex];
-                                // By default, visual dependency goes from source End to target Start
-                                const sourceEnd = sourceTask.dueDate || sourceTask.startDate || sourceTask.createdTime;
-                                const targetStart = task.startDate || task.createdTime;
+                                
+                                // Determine line connection points based on dependency type
+                                const isSourceEnd = dep.type === 'FS' || dep.type === 'FF';
+                                const isTargetEnd = dep.type === 'SF' || dep.type === 'FF';
 
-                                const sourceX = (getPosition(sourceEnd) / 100) * containerWidth;
-                                const targetX = (getPosition(targetStart) / 100) * containerWidth;
+                                const sourceTime = isSourceEnd ? (sourceTask.dueDate || sourceTask.startDate || sourceTask.createdTime) : (sourceTask.startDate || sourceTask.createdTime);
+                                const targetTime = isTargetEnd ? (task.dueDate || task.startDate || task.createdTime) : (task.startDate || task.createdTime);
+
+                                const sourceX = (getPosition(sourceTime) / 100) * containerWidth;
+                                const targetX = (getPosition(targetTime) / 100) * containerWidth;
                                 
                                 const sourceY = 20 + sourceIndex * 60 + 34; // 20px padding top + 60px per row + 34px to center of bar
                                 const targetY = 20 + targetIndex * 60 + 34;
 
-                                // Orthogonal path
+                                const sourceOffsetX = isSourceEnd ? 15 : -15;
+                                const targetOffsetX = isTargetEnd ? 15 : -15;
+
+                                // Orthogonal path logic needs to account for all 4 types to look neat.
                                 let path = '';
-                                if (sourceX <= targetX) {
-                                    // Standard left-to-right flow
-                                    path = `M ${sourceX} ${sourceY} L ${sourceX + 15} ${sourceY} L ${sourceX + 15} ${targetY} L ${targetX} ${targetY}`;
+                                if (dep.type === 'FS') {
+                                    if (sourceX <= targetX) {
+                                        path = `M ${sourceX} ${sourceY} L ${sourceX + 15} ${sourceY} L ${sourceX + 15} ${targetY} L ${targetX} ${targetY}`;
+                                    } else {
+                                        path = `M ${sourceX} ${sourceY} L ${sourceX + 15} ${sourceY} L ${sourceX + 15} ${sourceY + 30} L ${targetX - 15} ${sourceY + 30} L ${targetX - 15} ${targetY} L ${targetX} ${targetY}`;
+                                    }
                                 } else {
-                                    // Target starts before source ends (backward dependency)
-                                    path = `M ${sourceX} ${sourceY} L ${sourceX + 15} ${sourceY} L ${sourceX + 15} ${sourceY + 30} L ${targetX - 15} ${sourceY + 30} L ${targetX - 15} ${targetY} L ${targetX} ${targetY}`;
+                                    // Generic fallback for other types (SS, FF, SF) - simplified routing
+                                    path = `M ${sourceX} ${sourceY} L ${sourceX + sourceOffsetX} ${sourceY} L ${sourceX + sourceOffsetX} ${(sourceY+targetY)/2} L ${targetX + targetOffsetX} ${(sourceY+targetY)/2} L ${targetX + targetOffsetX} ${targetY} L ${targetX} ${targetY}`;
                                 }
 
                                 // Calculate midpoint for delete button
-                                const midX = sourceX <= targetX ? sourceX + 15 : (sourceX + targetX) / 2;
-                                const midY = sourceX <= targetX ? (sourceY + targetY) / 2 : sourceY + 30;
+                                const midX = (sourceX + targetX) / 2;
+                                const midY = (sourceY + targetY) / 2;
 
                                 return (
-                                    <g key={`${depId}-${task.id}`}>
+                                    <g key={`${dep.id}-${task.id}`}>
                                         <path d={path} stroke="var(--joplin-color)" strokeWidth="2" fill="none" markerEnd="url(#arrow)" strokeDasharray="4 2" opacity={0.4} />
                                         <circle 
                                             cx={midX} 
@@ -448,7 +501,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 const currentDeps = task.dependsOn || [];
-                                                const newDeps = currentDeps.filter(id => id !== depId);
+                                                const newDeps = currentDeps.filter(d => d.id !== dep.id);
                                                 window.webviewApi.postMessage({ 
                                                     name: 'updateTaskDependencies', 
                                                     payload: { taskId: task.id, dependsOn: newDeps } 

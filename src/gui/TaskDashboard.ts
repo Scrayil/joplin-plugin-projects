@@ -345,9 +345,24 @@ export class TaskDashboard {
     }
 
     /**
-     * Updates only the dates of a task directly from Timeline drag-and-drop operations.
+     * Updates only the dates of a task directly from Timeline drag-and-drop operations,
+     * and cascades the changes to dependent tasks.
      */
     private async updateTaskDates(payload: { taskId: string, startDate: number, dueDate: number, subTasks: string[], urgency: string }) {
+        // First, fetch the original task to calculate the time delta
+        const originalNote = await getNote(payload.taskId, ['todo_due', 'application_data']);
+        let originalStart = 0;
+        let originalDue = originalNote.todo_due || 0;
+        if (originalNote.application_data) {
+            try {
+                const appData = JSON.parse(originalNote.application_data);
+                originalStart = appData['joplin-plugin-projects']?.startDate || 0;
+            } catch(e) {}
+        }
+
+        // Calculate delta (in ms) using the Due Date as reference point.
+        const deltaMs = payload.dueDate - originalDue;
+
         // We reuse the robust updateTask logic to ensure metadata and tags are kept in sync
         await this.updateTask(payload.taskId, {
             subTasks: payload.subTasks,
@@ -356,8 +371,73 @@ export class TaskDashboard {
             startDate: payload.startDate
         });
 
+        // If the task was moved in time, cascade the update to dependent tasks
+        if (deltaMs !== 0) {
+            // We use a set to keep track of visited nodes to prevent infinite loops (circular dependencies)
+            const visited = new Set<string>();
+            visited.add(payload.taskId);
+            
+            // In our current data model, tasks point to the task they DEPEND ON.
+            // So if Task B depends on Task A, Task B's dependsOn array contains A's ID.
+            // To cascade from A to B, we need to find all tasks that have A in their dependsOn array.
+            
+            // Re-fetch all tasks metadata via project service to find reverse dependencies
+            try {
+                const allData = await this.projectService.getDashboardData();
+                const allTasks = allData.tasks;
+                await this.cascadeTaskUpdate(payload.taskId, deltaMs, allTasks, visited);
+            } catch (err) {
+                console.error("TaskDashboard: Error in cascading updates", err);
+            }
+        }
+        
         // Notify the UI to refresh
         await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
+    }
+
+    /**
+     * Recursively shifts dates for tasks that depend on the given taskId.
+     * @param sourceTaskId The ID of the task that was moved
+     * @param deltaMs The amount of time to shift dependent tasks by
+     * @param allTasks The complete list of tasks to query against
+     * @param visited Set of task IDs already updated in this chain (prevents circular loops)
+     */
+    private async cascadeTaskUpdate(sourceTaskId: string, deltaMs: number, allTasks: any[], visited: Set<string>) {
+        // Find all tasks that depend on the sourceTask
+        const dependentTasks = allTasks.filter(t => 
+            t.dependsOn && Array.isArray(t.dependsOn) && t.dependsOn.some((d: any) => d.id === sourceTaskId)
+        );
+
+        for (const targetTask of dependentTasks) {
+            if (visited.has(targetTask.id)) continue; // Prevent circular dependencies
+            
+            // Get the specific dependency relation
+            const depRelation = targetTask.dependsOn.find((d: any) => d.id === sourceTaskId);
+            if (!depRelation) continue;
+
+            const targetStart = targetTask.startDate || targetTask.createdTime;
+            const targetDue = targetTask.dueDate || targetStart;
+
+            // In standard scheduling, we usually just push the task forward/backward by the same delta.
+            // A more complex implementation would calculate exactly the gap based on FS/SS/FF/SF,
+            // but for a smooth UX, shifting by the same delta maintains the relative schedule.
+            
+            const newTargetStart = targetStart > 0 ? targetStart + deltaMs : targetStart;
+            const newTargetDue = targetDue > 0 ? targetDue + deltaMs : targetDue;
+
+            visited.add(targetTask.id);
+
+            // Update the target task in the database
+            await this.updateTask(targetTask.id, {
+                subTasks: targetTask.subTasks.map((st: any) => st.title), // Simplification: we only need titles to recreate MD, but updateTask needs string[]
+                urgency: targetTask.tags.find((t: string) => ['high','medium','normal','low'].includes(t.toLowerCase())) || 'normal',
+                dueDate: newTargetDue,
+                startDate: newTargetStart
+            });
+
+            // Recurse to update tasks that depend on this target task
+            await this.cascadeTaskUpdate(targetTask.id, deltaMs, allTasks, visited);
+        }
     }
 
     /**
@@ -392,7 +472,7 @@ export class TaskDashboard {
     /**
      * Updates the task dependencies (dependsOn array) in the application_data.
      */
-    private async updateTaskDependencies(taskId: string, dependsOn: string[]) {
+    private async updateTaskDependencies(taskId: string, dependsOn: { id: string, type: 'FS'|'SS'|'FF'|'SF' }[]) {
         try {
             const currentNote = await getNote(taskId, ['application_data']);
             let appData: any = {};

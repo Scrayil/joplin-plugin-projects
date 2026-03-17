@@ -22,7 +22,7 @@ export interface Task {
     tags: string[];
     subTasks: SubTask[];
     isApproaching?: boolean;
-    dependsOn?: string[];
+    dependsOn?: { id: string, type: 'FS' | 'SS' | 'FF' | 'SF' }[];
 }
 
 /**

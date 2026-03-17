@@ -162,11 +162,13 @@ export class ProjectService {
             const subTasks = this.noteParser.parseSubTasks(n.body);
 
             let startDate: number | undefined = undefined;
+            let dependsOn: string[] | undefined = undefined;
             if (n.application_data) {
                 try {
                     const appData = JSON.parse(n.application_data);
-                    if (appData['joplin-plugin-projects'] && appData['joplin-plugin-projects'].startDate) {
+                    if (appData['joplin-plugin-projects']) {
                         startDate = appData['joplin-plugin-projects'].startDate;
+                        dependsOn = appData['joplin-plugin-projects'].dependsOn;
                     }
                 } catch (e) {
                     console.warn(`ProjectService: Failed to parse application_data for note ${n.id}`, e);
@@ -200,7 +202,8 @@ export class ProjectService {
                 projectName: project?.name,
                 tags: tags,
                 subTasks: subTasks,
-                isApproaching: isApproaching
+                isApproaching: isApproaching,
+                dependsOn: dependsOn
             });
         }
 

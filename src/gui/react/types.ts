@@ -22,6 +22,7 @@ export interface Task {
     tags: string[];
     subTasks: SubTask[];
     isApproaching?: boolean;
+    dependsOn?: string[];
 }
 
 /**

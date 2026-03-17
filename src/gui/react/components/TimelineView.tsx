@@ -16,7 +16,65 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
     const [contextMenu, setContextMenu] = React.useState<{x: number, y: number, task: Task} | null>(null);
     const [zoomLevel, setZoomLevel] = React.useState<number>(1); // 1 = Month, 2 = Week, 3 = Day
     const [visibleRange, setVisibleRange] = React.useState<{start: number, end: number}>({start: 0, end: 0});
+    const [containerWidth, setContainerWidth] = React.useState<number>(800);
     const wrapperRef = React.useRef<HTMLDivElement>(null);
+    const bodyRef = React.useRef<HTMLDivElement>(null);
+
+    const [draggingDep, setDraggingDep] = React.useState<{id: string, type: 'start'|'end', projectId: string} | null>(null);
+    const [mousePos, setMousePos] = React.useState<{x: number, y: number} | null>(null);
+
+    React.useEffect(() => {
+        if (!draggingDep) return;
+        
+        const onMove = (e: MouseEvent) => {
+            if (bodyRef.current) {
+                const rect = bodyRef.current.getBoundingClientRect();
+                setMousePos({ 
+                    x: e.clientX - rect.left + bodyRef.current.scrollLeft, 
+                    y: e.clientY - rect.top + bodyRef.current.scrollTop 
+                });
+            }
+        };
+        const onUp = () => {
+            setDraggingDep(null);
+            setMousePos(null);
+        };
+        
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        return () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+        };
+    }, [draggingDep]);
+
+    const handleCreateDependency = (sourceId: string, sourceType: 'start'|'end', targetId: string, targetType: 'start'|'end') => {
+        if (sourceId === targetId) return;
+        if (sourceType === targetType) return; // Must connect start->end or end->start
+        
+        const targetTask = tasks.find(t => t.id === targetId);
+        const sourceTask = tasks.find(t => t.id === sourceId);
+        if (!targetTask || !sourceTask) return;
+        
+        if (targetTask.projectId !== sourceTask.projectId) return; // Must be same project
+        
+        // For simplicity in the data model, we'll store the 'dependsOn' in the later task, 
+        // pointing to the earlier task.
+        // If an End is dragged to a Start, the Start task depends on the End task.
+        const dependeeId = sourceType === 'end' ? sourceId : targetId;
+        const dependentId = sourceType === 'end' ? targetId : sourceId;
+        
+        const dependentTask = tasks.find(t => t.id === dependentId);
+        if (!dependentTask) return;
+
+        const currentDeps = dependentTask.dependsOn || [];
+        if (!currentDeps.includes(dependeeId)) {
+            window.webviewApi.postMessage({ 
+                name: 'updateTaskDependencies', 
+                payload: { taskId: dependentId, dependsOn: [...currentDeps, dependeeId] } 
+            });
+        }
+    };
 
     const updateVisibleRange = React.useCallback(() => {
         if (!wrapperRef.current) return;
@@ -69,6 +127,8 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
         const scrollLeft = wrapper.scrollLeft;
         const viewportWidth = wrapper.clientWidth;
         const scrollWidth = wrapper.scrollWidth;
+
+        setContainerWidth(scrollWidth);
 
         const startPercent = scrollLeft / scrollWidth;
         const endPercent = (scrollLeft + viewportWidth) / scrollWidth;
@@ -301,8 +361,91 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                     ))}
                 </div>
 
-                <div className="timeline-body" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', width: '100%' }}>
+                <div className="timeline-body" ref={bodyRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', width: '100%', position: 'relative' }}>
                     <div style={{ position: 'relative', minHeight: '100%', padding: '20px 0', boxSizing: 'border-box' }}>
+                    {/* SVG Layer for Dependency Lines */}
+                    <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 5 }}>
+                        <defs>
+                            <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--joplin-color)" opacity="0.6" />
+                            </marker>
+                        </defs>
+                        {timelineTasks.map((task, targetIndex) => {
+                            if (!task.dependsOn || task.dependsOn.length === 0) return null;
+                            return task.dependsOn.map(depId => {
+                                const sourceIndex = timelineTasks.findIndex(t => t.id === depId);
+                                if (sourceIndex === -1) return null;
+                                
+                                const sourceTask = timelineTasks[sourceIndex];
+                                // By default, visual dependency goes from source End to target Start
+                                const sourceEnd = sourceTask.dueDate || sourceTask.startDate || sourceTask.createdTime;
+                                const targetStart = task.startDate || task.createdTime;
+
+                                const sourceX = (getPosition(sourceEnd) / 100) * containerWidth;
+                                const targetX = (getPosition(targetStart) / 100) * containerWidth;
+                                
+                                const sourceY = 20 + sourceIndex * 60 + 34; // 20px padding top + 60px per row + 34px to center of bar
+                                const targetY = 20 + targetIndex * 60 + 34;
+
+                                // Orthogonal path
+                                let path = '';
+                                if (sourceX <= targetX) {
+                                    // Standard left-to-right flow
+                                    path = `M ${sourceX} ${sourceY} L ${sourceX + 15} ${sourceY} L ${sourceX + 15} ${targetY} L ${targetX} ${targetY}`;
+                                } else {
+                                    // Target starts before source ends (backward dependency)
+                                    path = `M ${sourceX} ${sourceY} L ${sourceX + 15} ${sourceY} L ${sourceX + 15} ${sourceY + 30} L ${targetX - 15} ${sourceY + 30} L ${targetX - 15} ${targetY} L ${targetX} ${targetY}`;
+                                }
+
+                                // Calculate midpoint for delete button
+                                const midX = sourceX <= targetX ? sourceX + 15 : (sourceX + targetX) / 2;
+                                const midY = sourceX <= targetX ? (sourceY + targetY) / 2 : sourceY + 30;
+
+                                return (
+                                    <g key={`${depId}-${task.id}`}>
+                                        <path d={path} stroke="var(--joplin-color)" strokeWidth="2" fill="none" markerEnd="url(#arrow)" strokeDasharray="4 2" opacity={0.4} />
+                                        <circle 
+                                            cx={midX} 
+                                            cy={midY} 
+                                            r="8" 
+                                            fill="var(--joplin-background-color)" 
+                                            stroke="var(--joplin-divider-color)" 
+                                            strokeWidth="1"
+                                            style={{ cursor: 'pointer', pointerEvents: 'all' }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                const currentDeps = task.dependsOn || [];
+                                                const newDeps = currentDeps.filter(id => id !== depId);
+                                                window.webviewApi.postMessage({ 
+                                                    name: 'updateTaskDependencies', 
+                                                    payload: { taskId: task.id, dependsOn: newDeps } 
+                                                });
+                                            }}
+                                        />
+                                        <text x={midX} y={midY} fontSize="10" fill="#ff4757" textAnchor="middle" dominantBaseline="central" style={{ pointerEvents: 'none', fontWeight: 'bold' }}>✕</text>
+                                    </g>
+                                );
+                            });
+                        })}
+                        {draggingDep && mousePos && (() => {
+                            const sourceIndex = timelineTasks.findIndex(t => t.id === draggingDep.id);
+                            if (sourceIndex === -1) return null;
+                            const sourceTask = timelineTasks[sourceIndex];
+                            
+                            const sourceTime = draggingDep.type === 'end' 
+                                ? (sourceTask.dueDate || sourceTask.startDate || sourceTask.createdTime)
+                                : (sourceTask.startDate || sourceTask.createdTime);
+                            
+                            const sourceX = (getPosition(sourceTime) / 100) * containerWidth;
+                            const sourceY = 20 + sourceIndex * 60 + 34;
+                            
+                            const directionX = draggingDep.type === 'end' ? 15 : -15;
+                            const path = `M ${sourceX} ${sourceY} L ${sourceX + directionX} ${sourceY} L ${sourceX + directionX} ${mousePos.y} L ${mousePos.x} ${mousePos.y}`;
+                            
+                            return <path d={path} stroke="var(--joplin-color)" strokeWidth="2" fill="none" markerEnd="url(#arrow)" opacity={0.8} />;
+                        })()}
+                    </svg>
+
                     {/* Vertical Dividers */}
                     {markers.map(marker => (
                         <div key={`div-${marker.time}`} style={{
@@ -323,7 +466,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                         <div style={{ position: 'absolute', bottom: '5px', right: '6px', color: '#ff4757', fontSize: '0.65rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>TODAY</div>
                     </div>
 
-                    {timelineTasks.map(task => {
+                    {timelineTasks.map((task, index) => {
                         const effectiveStart = task.startDate || task.createdTime;
                         const startPos = getPosition(effectiveStart);
                         const endPos = getPosition(task.dueDate || effectiveStart);
@@ -331,9 +474,12 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                         const projectColor = getProjectColor(task.projectId);
                         const isOverdue = task.dueDate! > 0 && task.dueDate! < Date.now() && task.status !== 'done';
                         const isApproaching = task.isApproaching && !isOverdue && task.status !== 'done';
+                        
+                        const isDroppableTarget = draggingDep && draggingDep.id !== task.id && draggingDep.projectId === task.projectId;
 
                         return (
-                            <div key={task.id} className={`timeline-row ${isOverdue ? 'overdue' : ''} ${isApproaching ? 'approaching' : ''}`} style={{ height: '60px', position: 'relative', borderBottom: '1px solid var(--joplin-divider-color)', margin: '0 10px', cursor: 'pointer' }} 
+                            <div key={task.id} className={`timeline-row ${isOverdue ? 'overdue' : ''} ${isApproaching ? 'approaching' : ''} ${isDroppableTarget ? 'droppable' : ''}`} 
+                                 style={{ height: '60px', position: 'relative', borderBottom: '1px solid var(--joplin-divider-color)', margin: '0 10px', cursor: draggingDep ? 'copy' : 'pointer' }} 
                                  onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
                                  onContextMenu={(e) => handleContextMenu(e, task)}
                                  title={`${task.projectName}\n${task.title}${task.startDate && task.startDate > 0 ? `\nStart: ${formatDate(task.startDate)}` : ''}${task.dueDate! > 0 ? `\n${isOverdue ? '(Overdue) ' : (isApproaching ? '(Approaching) ' : '')}Due: ${formatDate(task.dueDate!)}` : ''}`}>
@@ -351,7 +497,38 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                                     borderRadius: '4px', 
                                     boxShadow: '0 1px 3px rgba(0,0,0,0.1)', 
                                     opacity: task.status === 'done' ? 0.5 : 1 
-                                }}></div>
+                                }}>
+                                    {/* Start Handle */}
+                                    <div 
+                                        style={{ position: 'absolute', left: '-6px', top: '50%', transform: 'translateY(-50%)', width: '12px', height: '12px', borderRadius: '50%', background: 'var(--joplin-background-color)', border: `2px solid ${projectColor}`, cursor: 'crosshair', zIndex: 11, opacity: 1, transition: 'transform 0.2s', transformOrigin: 'center' }}
+                                        onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setDraggingDep({id: task.id, type: 'start', projectId: task.projectId}); }}
+                                        onMouseUp={(e) => {
+                                            if (draggingDep && draggingDep.id !== task.id) {
+                                                e.stopPropagation();
+                                                handleCreateDependency(draggingDep.id, draggingDep.type, task.id, 'start');
+                                            }
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-50%) scale(1.3)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(-50%) scale(1)'}
+                                        title={draggingDep ? "Drop to connect to Start" : "Drag from Start to create dependency"}
+                                        className="dep-handle start-handle"
+                                    />
+                                    {/* End Handle */}
+                                    <div 
+                                        style={{ position: 'absolute', right: '-6px', top: '50%', transform: 'translateY(-50%)', width: '12px', height: '12px', borderRadius: '50%', background: 'var(--joplin-background-color)', border: `2px solid ${projectColor}`, cursor: 'crosshair', zIndex: 11, opacity: 1, transition: 'transform 0.2s', transformOrigin: 'center' }}
+                                        onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setDraggingDep({id: task.id, type: 'end', projectId: task.projectId}); }}
+                                        onMouseUp={(e) => {
+                                            if (draggingDep && draggingDep.id !== task.id) {
+                                                e.stopPropagation();
+                                                handleCreateDependency(draggingDep.id, draggingDep.type, task.id, 'end');
+                                            }
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-50%) scale(1.3)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(-50%) scale(1)'}
+                                        title={draggingDep ? "Drop to connect to End" : "Drag from End to create dependency"}
+                                        className="dep-handle end-handle"
+                                    />
+                                </div>
                                 <div style={{ 
                                     position: 'absolute', 
                                     left: `${startPos}%`, 

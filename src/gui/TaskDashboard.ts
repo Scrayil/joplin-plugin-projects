@@ -78,6 +78,9 @@ export class TaskDashboard {
                 if (message.name === 'updateTaskStatus') {
                     return await this.updateTaskStatus(message.payload);
                 }
+                if (message.name === 'updateTaskDependencies') {
+                    return await this.updateTaskDependencies(message.payload.taskId, message.payload.dependsOn);
+                }
                 if (message.name === 'toggleSubTask') {
                     return await this.toggleSubTask(message.payload);
                 }
@@ -366,6 +369,42 @@ export class TaskDashboard {
         await this.tagService.updateStatusTags(taskId, newStatus);
 
         return { success: true };
+    }
+
+    /**
+     * Updates the task dependencies (dependsOn array) in the application_data.
+     */
+    private async updateTaskDependencies(taskId: string, dependsOn: string[]) {
+        try {
+            const currentNote = await getNote(taskId, ['application_data']);
+            let appData: any = {};
+            if (currentNote.application_data) {
+                try {
+                    appData = JSON.parse(currentNote.application_data);
+                } catch(e) {
+                    console.warn(`TaskDashboard: Failed to parse application_data for note ${taskId}`);
+                }
+            }
+
+            if (!appData['joplin-plugin-projects']) {
+                appData['joplin-plugin-projects'] = {};
+            }
+
+            if (dependsOn && dependsOn.length > 0) {
+                appData['joplin-plugin-projects'].dependsOn = dependsOn;
+            } else {
+                delete appData['joplin-plugin-projects'].dependsOn;
+            }
+
+            await updateNote(taskId, { 
+                application_data: JSON.stringify(appData)
+            });
+            return { success: true };
+        } catch (error) {
+            console.error('TaskDashboard: Error in updateTaskDependencies:', error);
+            await joplin.views.dialogs.showToast({ message: "Error updating dependencies", duration: 3000, type: ToastType.Error });
+            return { success: false };
+        }
     }
 
     /**

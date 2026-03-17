@@ -32,31 +32,14 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
     const [expandedTask, setExpandedTask] = React.useState<string | null>(null);
 
     /**
-     * Filters and sorts tasks for a specific column (status).
-     * Sorts by Due Date -> Priority -> Creation Time.
+     * Filters tasks for a specific column (status).
+     * Tasks are already sorted globally by the parent component.
      */
     const getTasksByStatus = (status: string) => {
-        let filteredTasks = [];
-        if (status === 'todo') filteredTasks = tasks.filter(t => t.status === 'todo' || t.status === 'overdue');
-        else if (status === 'in_progress') filteredTasks = tasks.filter(t => t.status === 'in_progress');
-        else if (status === 'done') filteredTasks = tasks.filter(t => t.status === 'done');
-        
-        const getPriorityValue = (tags: string[]) => {
-            if (tags.some(t => t.toLowerCase().includes('high'))) return 1;
-            if (tags.some(t => t.toLowerCase().includes('normal') || t.toLowerCase().includes('medium'))) return 2;
-            if (tags.some(t => t.toLowerCase().includes('low'))) return 3;
-            return 4;
-        };
-
-        return filteredTasks.sort((a, b) => {
-            const dateA = a.dueDate ? a.dueDate : Number.MAX_VALUE;
-            const dateB = b.dueDate ? b.dueDate : Number.MAX_VALUE;
-            if (dateA !== dateB) return dateA - dateB;
-            const prioA = getPriorityValue(a.tags);
-            const prioB = getPriorityValue(b.tags);
-            if (prioA !== prioB) return prioA - prioB;
-            return a.createdTime - b.createdTime;
-        });
+        if (status === 'todo') return tasks.filter(t => t.status === 'todo' || t.status === 'overdue');
+        if (status === 'in_progress') return tasks.filter(t => t.status === 'in_progress');
+        if (status === 'done') return tasks.filter(t => t.status === 'done');
+        return [];
     };
 
     /**

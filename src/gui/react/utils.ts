@@ -19,3 +19,14 @@ export function formatDate(timestamp: number, includeTime = true) {
 
     return date.toLocaleDateString('en-GB', options).replace(/,/g, '');
 }
+
+/**
+ * Maps task tags to a numeric priority value for sorting.
+ * 1 = High, 2 = Normal/Medium, 3 = Low, 4 = None/Other
+ */
+export function getPriorityValue(tags: string[]) {
+    if (tags.some(t => t.toLowerCase().includes('high'))) return 1;
+    if (tags.some(t => t.toLowerCase().includes('normal') || t.toLowerCase().includes('medium'))) return 2;
+    if (tags.some(t => t.toLowerCase().includes('low'))) return 3;
+    return 4;
+}

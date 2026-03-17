@@ -6,6 +6,7 @@ import TimelineView from './components/TimelineView';
 import ListView from './components/ListView';
 import InfoView from './components/InfoView';
 import WikiView from './components/WikiView';
+import { getPriorityValue } from './utils';
 
 /**
  * Main application component for the Task Dashboard.
@@ -16,6 +17,7 @@ const App: React.FC = () => {
     const [data, setData] = useState<DashboardData>({ projects: [], tasks: [] });
     const [loading, setLoading] = useState(true);
     const [projectFilter, setProjectFilter] = useState<string>('all');
+    const [sortOption, setSortOption] = useState<string>('dueDate');
     const [showUrgentOnly, setShowUrgentOnly] = useState(false);
     const [lastUpdated, setLastUpdated] = useState(Date.now());
     const isFetching = React.useRef(false);
@@ -222,8 +224,30 @@ const App: React.FC = () => {
                 return isOverdue || isApproaching;
             });
         }
-        return tasks;
-    }, [data.tasks, projectFilter, showUrgentOnly]);
+        
+        return tasks.sort((a, b) => {
+            if (sortOption === 'dueDate') {
+                const dateA = a.dueDate ? a.dueDate : Number.MAX_VALUE;
+                const dateB = b.dueDate ? b.dueDate : Number.MAX_VALUE;
+                if (dateA !== dateB) return dateA - dateB;
+                // fallback to priority
+                return getPriorityValue(a.tags) - getPriorityValue(b.tags);
+            } else if (sortOption === 'startDate') {
+                const startA = a.startDate || a.createdTime;
+                const startB = b.startDate || b.createdTime;
+                if (startA !== startB) return startA - startB;
+                return (a.dueDate || Number.MAX_VALUE) - (b.dueDate || Number.MAX_VALUE);
+            } else if (sortOption === 'priority') {
+                const prioA = getPriorityValue(a.tags);
+                const prioB = getPriorityValue(b.tags);
+                if (prioA !== prioB) return prioA - prioB;
+                return (a.dueDate || Number.MAX_VALUE) - (b.dueDate || Number.MAX_VALUE);
+            } else if (sortOption === 'createdTime') {
+                return b.createdTime - a.createdTime; // Newest first
+            }
+            return 0;
+        });
+    }, [data.tasks, projectFilter, showUrgentOnly, sortOption]);
 
     if (loading) return <div>Loading tasks...</div>;
 
@@ -247,6 +271,19 @@ const App: React.FC = () => {
                     ) : (
                         <h1>All Tasks</h1>
                     )}
+                    <div className="select-wrapper">
+                        <select 
+                            className="project-filter-select"
+                            value={sortOption} 
+                            onChange={(e) => setSortOption(e.target.value)}
+                            title="Sort by"
+                        >
+                            <option value="dueDate">Sort by Due Date</option>
+                            <option value="startDate">Sort by Start Date</option>
+                            <option value="priority">Sort by Priority</option>
+                            <option value="createdTime">Sort by Created Time</option>
+                        </select>
+                    </div>
                     <button 
                         className="action-btn"
                         onClick={handleOpenCreateTaskDialog} 

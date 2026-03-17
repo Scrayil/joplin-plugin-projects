@@ -87,28 +87,10 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
         const endPercent = (scrollLeft + viewportWidth) / scrollWidth;
     }, []);
 
-    const getPriorityValue = (tags: string[]) => {
-        if (tags.some(t => t.toLowerCase().includes('high'))) return 1;
-        if (tags.some(t => t.toLowerCase().includes('normal') || t.toLowerCase().includes('medium'))) return 2;
-        if (tags.some(t => t.toLowerCase().includes('low'))) return 3;
-        return 4;
-    };
-
     // We need to move the time calculations up so they can be used in the scroll listener
     const now = Date.now();
     const timelineTasks = tasks
-        .filter(t => t.dueDate && t.dueDate > 0 && t.status !== 'done')
-        .sort((a, b) => {
-            const dateA = a.dueDate || 0;
-            const dateB = b.dueDate || 0;
-            if (dateA !== dateB) return dateA - dateB;
-            const prioA = getPriorityValue(a.tags);
-            const prioB = getPriorityValue(b.tags);
-            if (prioA !== prioB) return prioA - prioB;
-            const startA = a.startDate || a.createdTime;
-            const startB = b.startDate || b.createdTime;
-            return startA - startB;
-        });
+        .filter(t => t.dueDate && t.dueDate > 0 && t.status !== 'done');
 
     const minTime = timelineTasks.length > 0 ? Math.min(...timelineTasks.map(t => t.startDate || t.createdTime), now) : now;
     const maxTime = timelineTasks.length > 0 ? Math.max(...timelineTasks.map(t => t.dueDate || 0), now) : now;

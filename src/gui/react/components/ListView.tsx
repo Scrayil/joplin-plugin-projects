@@ -15,26 +15,8 @@ interface ListViewProps {
 const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) => {
     const [contextMenu, setContextMenu] = React.useState<{x: number, y: number, task: Task} | null>(null);
 
-    const getPriorityValue = (tags: string[]) => {
-        if (tags.some(t => t.toLowerCase().includes('high'))) return 1;
-        if (tags.some(t => t.toLowerCase().includes('normal') || t.toLowerCase().includes('medium'))) return 2;
-        if (tags.some(t => t.toLowerCase().includes('low'))) return 3;
-        return 4;
-    };
-
     const activeTasks = tasks
-        .filter(t => t.status !== 'done')
-        .sort((a, b) => {
-            const dateA = a.dueDate ? a.dueDate : Number.MAX_VALUE;
-            const dateB = b.dueDate ? b.dueDate : Number.MAX_VALUE;
-            if (dateA !== dateB) return dateA - dateB;
-
-            const prioA = getPriorityValue(a.tags);
-            const prioB = getPriorityValue(b.tags);
-            if (prioA !== prioB) return prioA - prioB;
-
-            return a.createdTime - b.createdTime;
-        });
+        .filter(t => t.status !== 'done');
 
     const getPriorityDisplay = (tags: string[]) => {
         const priorityTag = tags.find(t => 

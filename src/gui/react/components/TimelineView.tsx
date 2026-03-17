@@ -23,19 +23,83 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
     const [draggingDep, setDraggingDep] = React.useState<{id: string, type: 'start'|'end', projectId: string} | null>(null);
     const [mousePos, setMousePos] = React.useState<{x: number, y: number} | null>(null);
 
+    // States for Task Bar Drag & Drop (Scheduling)
+    const [draggingTask, setDraggingTask] = React.useState<{ id: string, initialX: number, initialStart: number, initialDue: number, type: 'move' | 'resizeStart' | 'resizeEnd' } | null>(null);
+    const [tempTaskDates, setTempTaskDates] = React.useState<Record<string, { start: number, end: number }>>({});
+
+    // We need to move the time calculations up so they can be used in the scroll listener and effects
+    const now = Date.now();
+    const timelineTasks = tasks
+        .filter(t => t.dueDate && t.dueDate > 0 && t.status !== 'done');
+
+    const minTime = timelineTasks.length > 0 ? Math.min(...timelineTasks.map(t => t.startDate || t.createdTime), now) : now;
+    const maxTime = timelineTasks.length > 0 ? Math.max(...timelineTasks.map(t => t.dueDate || 0), now) : now;
+    
+    const twoMonthsMs = 60 * 24 * 60 * 60 * 1000;
+    const startRange = minTime - twoMonthsMs;
+    const endRange = maxTime + twoMonthsMs;
+    const viewDuration = endRange - startRange;
+
     React.useEffect(() => {
-        if (!draggingDep) return;
+        if (!draggingDep && !draggingTask) return;
         
         const onMove = (e: MouseEvent) => {
             if (bodyRef.current) {
                 const rect = bodyRef.current.getBoundingClientRect();
-                setMousePos({ 
-                    x: e.clientX - rect.left + bodyRef.current.scrollLeft, 
-                    y: e.clientY - rect.top + bodyRef.current.scrollTop 
-                });
+                const currentX = e.clientX - rect.left + bodyRef.current.scrollLeft;
+                
+                if (draggingDep) {
+                    setMousePos({ 
+                        x: currentX, 
+                        y: e.clientY - rect.top + bodyRef.current.scrollTop 
+                    });
+                } else if (draggingTask) {
+                    const deltaX = currentX - draggingTask.initialX;
+                    const containerW = containerWidth || 800; // fallback
+                    const timePerPixel = viewDuration / containerW;
+                    const deltaTime = deltaX * timePerPixel;
+                    
+                    let newStart = draggingTask.initialStart;
+                    let newEnd = draggingTask.initialDue;
+                    
+                    if (draggingTask.type === 'move') {
+                        newStart += deltaTime;
+                        newEnd += deltaTime;
+                    } else if (draggingTask.type === 'resizeStart') {
+                        newStart = Math.min(draggingTask.initialStart + deltaTime, newEnd - (24*60*60*1000)); // prevent overlapping past end
+                    } else if (draggingTask.type === 'resizeEnd') {
+                        newEnd = Math.max(draggingTask.initialDue + deltaTime, newStart + (24*60*60*1000)); // prevent overlapping past start
+                    }
+                    
+                    setTempTaskDates(prev => ({
+                        ...prev,
+                        [draggingTask.id]: { start: newStart, end: newEnd }
+                    }));
+                }
             }
         };
         const onUp = () => {
+            if (draggingTask) {
+                const tempDates = tempTaskDates[draggingTask.id];
+                if (tempDates) {
+                    // Snap to end of day to be safe, or just leave as exact timestamp
+                    const updatedTask = tasks.find(t => t.id === draggingTask.id);
+                    if (updatedTask) {
+                         window.webviewApi.postMessage({
+                             name: 'updateTaskDates',
+                             payload: { 
+                                 taskId: draggingTask.id, 
+                                 startDate: tempDates.start, 
+                                 dueDate: tempDates.end,
+                                 subTasks: updatedTask.subTasks,
+                                 urgency: updatedTask.tags.find(t => ['high','medium','normal','low'].includes(t.toLowerCase())) || 'normal'
+                             }
+                         });
+                    }
+                }
+                setDraggingTask(null);
+                setTempTaskDates({});
+            }
             setDraggingDep(null);
             setMousePos(null);
         };
@@ -46,7 +110,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
         };
-    }, [draggingDep]);
+    }, [draggingDep, draggingTask, containerWidth, viewDuration, tempTaskDates, tasks]);
 
     const handleCreateDependency = (sourceId: string, sourceType: 'start'|'end', targetId: string, targetType: 'start'|'end') => {
         if (sourceId === targetId) return;
@@ -86,19 +150,6 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
         const startPercent = scrollLeft / scrollWidth;
         const endPercent = (scrollLeft + viewportWidth) / scrollWidth;
     }, []);
-
-    // We need to move the time calculations up so they can be used in the scroll listener
-    const now = Date.now();
-    const timelineTasks = tasks
-        .filter(t => t.dueDate && t.dueDate > 0 && t.status !== 'done');
-
-    const minTime = timelineTasks.length > 0 ? Math.min(...timelineTasks.map(t => t.startDate || t.createdTime), now) : now;
-    const maxTime = timelineTasks.length > 0 ? Math.max(...timelineTasks.map(t => t.dueDate || 0), now) : now;
-    
-    const twoMonthsMs = 60 * 24 * 60 * 60 * 1000;
-    const startRange = minTime - twoMonthsMs;
-    const endRange = maxTime + twoMonthsMs;
-    const viewDuration = endRange - startRange;
 
     const firstTaskTime = timelineTasks.length > 0 ? Math.min(...timelineTasks.map(t => t.startDate || t.createdTime)) : now;
     const lastTaskTime = timelineTasks.length > 0 ? Math.max(...timelineTasks.map(t => t.dueDate || 0)) : now;
@@ -449,12 +500,13 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                     </div>
 
                     {timelineTasks.map((task, index) => {
-                        const effectiveStart = task.startDate || task.createdTime;
+                        const effectiveStart = tempTaskDates[task.id] ? tempTaskDates[task.id].start : (task.startDate || task.createdTime);
+                        const effectiveDue = tempTaskDates[task.id] ? tempTaskDates[task.id].end : (task.dueDate || effectiveStart);
                         const startPos = getPosition(effectiveStart);
-                        const endPos = getPosition(task.dueDate || effectiveStart);
+                        const endPos = getPosition(effectiveDue);
                         const width = Math.max(endPos - startPos, 0.5);
                         const projectColor = getProjectColor(task.projectId);
-                        const isOverdue = task.dueDate! > 0 && task.dueDate! < Date.now() && task.status !== 'done';
+                        const isOverdue = effectiveDue > 0 && effectiveDue < Date.now() && task.status !== 'done';
                         const isApproaching = task.isApproaching && !isOverdue && task.status !== 'done';
                         
                         const isDroppableTarget = draggingDep && draggingDep.id !== task.id && draggingDep.projectId === task.projectId;
@@ -469,7 +521,24 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                                     <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: projectColor, display: 'inline-block', flexShrink: 0 }}></span>
                                     <span style={{ color: 'orange' }}>[{task.projectName}]</span> {task.title}
                                 </div>
-                                <div className={`timeline-bar ${task.status === 'done' ? 'done' : ''}`} style={{ 
+                                <div className={`timeline-bar ${task.status === 'done' ? 'done' : ''}`} 
+                                    onMouseDown={(e) => {
+                                        if (e.button !== 0) return; // Only left click
+                                        e.stopPropagation(); 
+                                        e.preventDefault();
+                                        if (bodyRef.current) {
+                                            const rect = bodyRef.current.getBoundingClientRect();
+                                            const currentX = e.clientX - rect.left + bodyRef.current.scrollLeft;
+                                            setDraggingTask({ 
+                                                id: task.id, 
+                                                initialX: currentX, 
+                                                initialStart: task.startDate || task.createdTime, 
+                                                initialDue: task.dueDate || task.startDate || task.createdTime,
+                                                type: 'move'
+                                            });
+                                        }
+                                    }}
+                                    style={{ 
                                     position: 'absolute', 
                                     left: `${startPos}%`, 
                                     width: `${width}%`, 
@@ -478,8 +547,49 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                                     background: task.status === 'done' ? 'var(--joplin-divider-color)' : projectColor, 
                                     borderRadius: '4px', 
                                     boxShadow: '0 1px 3px rgba(0,0,0,0.1)', 
-                                    opacity: task.status === 'done' ? 0.5 : 1 
+                                    opacity: task.status === 'done' ? 0.5 : 1,
+                                    cursor: 'ew-resize'
                                 }}>
+                                    {/* Invisible Resize Area Left */}
+                                    <div 
+                                        style={{ position: 'absolute', left: 0, top: '-5px', width: '8px', height: '18px', cursor: 'col-resize', zIndex: 12 }}
+                                        onMouseDown={(e) => {
+                                            if (e.button !== 0) return;
+                                            e.stopPropagation(); 
+                                            e.preventDefault();
+                                            if (bodyRef.current) {
+                                                const rect = bodyRef.current.getBoundingClientRect();
+                                                const currentX = e.clientX - rect.left + bodyRef.current.scrollLeft;
+                                                setDraggingTask({ 
+                                                    id: task.id, 
+                                                    initialX: currentX, 
+                                                    initialStart: task.startDate || task.createdTime, 
+                                                    initialDue: task.dueDate || task.startDate || task.createdTime,
+                                                    type: 'resizeStart'
+                                                });
+                                            }
+                                        }}
+                                    />
+                                    {/* Invisible Resize Area Right */}
+                                    <div 
+                                        style={{ position: 'absolute', right: 0, top: '-5px', width: '8px', height: '18px', cursor: 'col-resize', zIndex: 12 }}
+                                        onMouseDown={(e) => {
+                                            if (e.button !== 0) return;
+                                            e.stopPropagation(); 
+                                            e.preventDefault();
+                                            if (bodyRef.current) {
+                                                const rect = bodyRef.current.getBoundingClientRect();
+                                                const currentX = e.clientX - rect.left + bodyRef.current.scrollLeft;
+                                                setDraggingTask({ 
+                                                    id: task.id, 
+                                                    initialX: currentX, 
+                                                    initialStart: task.startDate || task.createdTime, 
+                                                    initialDue: task.dueDate || task.startDate || task.createdTime,
+                                                    type: 'resizeEnd'
+                                                });
+                                            }
+                                        }}
+                                    />
                                     {/* Start Handle */}
                                     <div 
                                         style={{ position: 'absolute', left: '-6px', top: '50%', transform: 'translateY(-50%)', width: '12px', height: '12px', borderRadius: '50%', background: 'var(--joplin-background-color)', border: `2px solid ${projectColor}`, cursor: 'crosshair', zIndex: 11, opacity: 1, transition: 'transform 0.2s', transformOrigin: 'center' }}

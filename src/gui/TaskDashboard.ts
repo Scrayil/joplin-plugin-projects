@@ -78,6 +78,9 @@ export class TaskDashboard {
                 if (message.name === 'updateTaskStatus') {
                     return await this.updateTaskStatus(message.payload);
                 }
+                if (message.name === 'updateTaskDates') {
+                    return await this.updateTaskDates(message.payload);
+                }
                 if (message.name === 'updateTaskDependencies') {
                     return await this.updateTaskDependencies(message.payload.taskId, message.payload.dependsOn);
                 }
@@ -306,7 +309,7 @@ export class TaskDashboard {
             // Retrieve existing body to merge updates without data loss
             const currentNote = await getNote(taskId, ['body', 'application_data']);
             const body = this.noteParser.updateNoteBodyWithSubTasks(currentNote.body, payload.subTasks);
-            
+
             let appData: any = {};
             if (currentNote.application_data) {
                 try {
@@ -342,8 +345,23 @@ export class TaskDashboard {
     }
 
     /**
-     * Updates the task's completion status and synchronizes subtask checkboxes.
-     * Also updates status tags (e.g., 'done', 'in_progress').
+     * Updates only the dates of a task directly from Timeline drag-and-drop operations.
+     */
+    private async updateTaskDates(payload: { taskId: string, startDate: number, dueDate: number, subTasks: string[], urgency: string }) {
+        // We reuse the robust updateTask logic to ensure metadata and tags are kept in sync
+        await this.updateTask(payload.taskId, {
+            subTasks: payload.subTasks,
+            urgency: payload.urgency,
+            dueDate: payload.dueDate,
+            startDate: payload.startDate
+        });
+
+        // Notify the UI to refresh
+        await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
+    }
+
+    /**
+     * Updates the task's completion status and synchronizes subtask checkboxes.     * Also updates status tags (e.g., 'done', 'in_progress').
      */
     private async updateTaskStatus(payload: { taskId: string, newStatus: string }) {
         const { taskId, newStatus } = payload;

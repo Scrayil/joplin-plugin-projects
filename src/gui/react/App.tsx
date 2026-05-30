@@ -18,10 +18,20 @@ const App: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [projectFilter, setProjectFilter] = useState<string>('all');
     const [sortOption, setSortOption] = useState<string>('dueDate');
+    // Bumped whenever the sort control is used, so re-applying the same option still
+    // re-triggers ordering (a native select fires no change event for an unchanged value).
+    const [sortApplyToken, setSortApplyToken] = useState(0);
     const [showUrgentOnly, setShowUrgentOnly] = useState(false);
     const [lastUpdated, setLastUpdated] = useState(Date.now());
     const isFetching = React.useRef(false);
     const isDialogOpen = React.useRef(false);
+
+    // Optimistic overlay: per-task patches applied on top of server data so every view
+    // reflects an action instantly. They are kept for a short window so the background
+    // poll cannot revert a fresh action, then expire once the backend has caught up.
+    const [pendingPatches, setPendingPatches] = useState<Record<string, { patch: Partial<Task>, ts: number }>>({});
+    const lastDataStr = React.useRef<string>('');
+    const PENDING_TTL_MS = 2500;
 
     /**
      * Fetches fresh dashboard data from the plugin backend.
@@ -31,8 +41,27 @@ const App: React.FC = () => {
         isFetching.current = true;
         try {
             const response = await window.webviewApi.postMessage({ name: 'getData' });
-            setData(response);
+            // Skip the state update (and the re-render/re-sort it triggers) when the
+            // polled data is unchanged, keeping the poll non-destructive.
+            const serialized = JSON.stringify(response);
+            if (serialized !== lastDataStr.current) {
+                lastDataStr.current = serialized;
+                setData(response);
+            }
             setLastUpdated(Date.now());
+            // Expire optimistic patches old enough for the backend to have caught up.
+            setPendingPatches(prev => {
+                const ids = Object.keys(prev);
+                if (ids.length === 0) return prev;
+                const cutoff = Date.now() - PENDING_TTL_MS;
+                let changed = false;
+                const next: typeof prev = {};
+                for (const id of ids) {
+                    if (prev[id].ts >= cutoff) next[id] = prev[id];
+                    else changed = true;
+                }
+                return changed ? next : prev;
+            });
         } catch (error) {
             console.error('Error fetching data:', error);
         } finally {
@@ -188,19 +217,15 @@ const App: React.FC = () => {
      * @param newStatus The new status value.
      */
     const handleUpdateStatus = async (taskId: string, newStatus: string) => {
-        const updatedTasks = data.tasks.map(t => {
-            if (t.id === taskId) {
-                let updatedSubTasks = t.subTasks;
-                if (newStatus === 'done') {
-                    updatedSubTasks = t.subTasks.map(st => ({ ...st, completed: true }));
-                } else if (t.status === 'done') {
-                    updatedSubTasks = t.subTasks.map(st => ({ ...st, completed: false }));
-                }
-                return { ...t, status: newStatus as any, subTasks: updatedSubTasks };
-            }
-            return t;
-        });
-        setData({ ...data, tasks: updatedTasks });
+        const current = mergedTasks.find(t => t.id === taskId);
+        if (!current) return;
+        let updatedSubTasks = current.subTasks;
+        if (newStatus === 'done') {
+            updatedSubTasks = current.subTasks.map(st => ({ ...st, completed: true }));
+        } else if (current.status === 'done') {
+            updatedSubTasks = current.subTasks.map(st => ({ ...st, completed: false }));
+        }
+        applyOptimistic(taskId, { status: newStatus as any, subTasks: updatedSubTasks });
 
         try {
              await window.webviewApi.postMessage({ name: 'updateTaskStatus', payload: { taskId, newStatus } });
@@ -218,19 +243,15 @@ const App: React.FC = () => {
      * @param checked The new completion state.
      */
     const handleToggleSubTask = async (taskId: string, subTaskIndex: number, checked: boolean) => {
-         const updatedTasks = data.tasks.map(t => {
-             if (t.id === taskId) {
-                 const newSubTasks = t.subTasks.map((st, i) =>
-                     i === subTaskIndex ? { ...st, completed: checked } : st
-                 );
-                 return { ...t, subTasks: newSubTasks };
-             }
-             return t;
-         });
-         setData({ ...data, tasks: updatedTasks });
+        const current = mergedTasks.find(t => t.id === taskId);
+        if (!current) return;
+        const newSubTasks = current.subTasks.map((st, i) =>
+            i === subTaskIndex ? { ...st, completed: checked } : st
+        );
+        applyOptimistic(taskId, { subTasks: newSubTasks });
 
-         try {
-             await window.webviewApi.postMessage({ name: 'toggleSubTask', payload: { taskId, subTaskIndex, checked } });
+        try {
+            await window.webviewApi.postMessage({ name: 'toggleSubTask', payload: { taskId, subTaskIndex, checked } });
         } catch (error) {
             console.error("Error toggling subtask:", error);
             fetchData();
@@ -250,13 +271,45 @@ const App: React.FC = () => {
     };
 
     /**
+     * Records an optimistic patch for a task so every view reflects the change instantly,
+     * ahead of the backend round-trip. Patches are merged and timestamped.
+     * @param taskId The task to patch.
+     * @param patch The partial task fields to override.
+     */
+    const applyOptimistic = (taskId: string, patch: Partial<Task>) => {
+        setPendingPatches(prev => ({
+            ...prev,
+            [taskId]: { patch: { ...(prev[taskId]?.patch || {}), ...patch }, ts: Date.now() }
+        }));
+    };
+
+    /**
+     * Optimistically updates a task's dependency list and persists it to the backend.
+     * @param taskId The dependent task whose dependency list changes.
+     * @param dependsOn The new dependency descriptors.
+     */
+    const handleUpdateDependencies = (taskId: string, dependsOn: { id: string, type: 'FS'|'SS'|'FF'|'SF' }[]) => {
+        applyOptimistic(taskId, { dependsOn });
+        window.webviewApi.postMessage({ name: 'updateTaskDependencies', payload: { taskId, dependsOn } });
+    };
+
+    /**
+     * Server task data with any still-pending optimistic patches applied on top, so the
+     * views render the latest user action instantly without waiting for the backend.
+     */
+    const mergedTasks = React.useMemo(
+        () => data.tasks.map(t => pendingPatches[t.id] ? { ...t, ...pendingPatches[t.id].patch } : t),
+        [data.tasks, pendingPatches]
+    );
+
+    /**
      * Derives the task list shown in the views by filtering on the selected project
      * and the urgency toggle, then sorting according to the active sort option.
      */
     const displayedTasks = React.useMemo(() => {
         let tasks = projectFilter === 'all'
-            ? data.tasks 
-            : data.tasks.filter(t => t.projectId === projectFilter);
+            ? mergedTasks
+            : mergedTasks.filter(t => t.projectId === projectFilter);
 
         if (showUrgentOnly) {
             const now = Date.now();
@@ -288,7 +341,7 @@ const App: React.FC = () => {
             }
             return 0;
         });
-    }, [data.tasks, projectFilter, showUrgentOnly, sortOption]);
+    }, [mergedTasks, projectFilter, showUrgentOnly, sortOption]);
 
     if (loading) return <div>Loading tasks...</div>;
 
@@ -313,10 +366,11 @@ const App: React.FC = () => {
                         <h1>All Tasks</h1>
                     )}
                     <div className="select-wrapper">
-                        <select 
+                        <select
                             className="project-filter-select"
-                            value={sortOption} 
+                            value={sortOption}
                             onChange={(e) => setSortOption(e.target.value)}
+                            onClick={() => setSortApplyToken(v => v + 1)}
                             title="Sort by"
                         >
                             <option value="dueDate">Sort by Due Date</option>
@@ -402,10 +456,13 @@ const App: React.FC = () => {
                     onOpenNote={handleOpenNote}
                     onEditTask={handleOpenEditTaskDialog}
                 />}
-                {activeTab === 'timeline' && <TimelineView 
-                    tasks={displayedTasks} 
-                    onOpenNote={handleOpenNote} 
+                {activeTab === 'timeline' && <TimelineView
+                    tasks={displayedTasks}
+                    sortOption={sortOption}
+                    sortApplyToken={sortApplyToken}
+                    onOpenNote={handleOpenNote}
                     onEditTask={handleOpenEditTaskDialog}
+                    onUpdateDependencies={handleUpdateDependencies}
                 />}
                 {activeTab === 'table' && <ListView 
                     tasks={displayedTasks} 

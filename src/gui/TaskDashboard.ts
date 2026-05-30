@@ -97,6 +97,20 @@ export class TaskDashboard {
                      return;
                 }
                 
+                if (message.name === 'showToast') {
+                    const toastTypes: { [key: string]: ToastType } = {
+                        error: ToastType.Error,
+                        success: ToastType.Success,
+                        info: ToastType.Info
+                    };
+                    await joplin.views.dialogs.showToast({
+                        message: message.payload?.message || '',
+                        duration: message.payload?.duration || 4000,
+                        type: toastTypes[message.payload?.type] || ToastType.Info
+                    });
+                    return;
+                }
+
                 if (message.name === 'log') {
                     console.log('React Log:', message.message);
                     return;
@@ -494,9 +508,11 @@ export class TaskDashboard {
                 delete appData['joplin-plugin-projects'].dependsOn;
             }
 
-            await updateNote(taskId, { 
+            await updateNote(taskId, {
                 application_data: JSON.stringify(appData)
             });
+            this.projectService.invalidateCache();
+            await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
             return { success: true };
         } catch (error) {
             console.error('TaskDashboard: Error in updateTaskDependencies:', error);

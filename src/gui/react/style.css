@@ -35,6 +35,7 @@
     --prj-today: #ff4757;
     --prj-project-tag: #e69500;
     --prj-danger: var(--joplin-color-error, #d32f2f);
+    --prj-critical: #7c3aed;
 
     /*
      * Per-project Gantt bar color: the hue is derived deterministically from the project
@@ -51,12 +52,14 @@ body.theme-dark {
     --prj-priority-low: #5dade2;
     --prj-status-inprogress: #5dade2;
     --prj-project-tag: #ffb454;
+    --prj-critical: #a78bfa;
     --prj-bar-saturation: 65%;
     --prj-bar-lightness: 62%;
 }
 
 /* Deeper hues and darker bars keep contrast on light backgrounds. */
 body.theme-light {
+    --prj-critical: #6d28d9;
     --prj-bar-saturation: 62%;
     --prj-bar-lightness: 44%;
 }
@@ -407,6 +410,37 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .timeline-row.approaching {
     background-color: var(--prj-approaching-bg) !important;
+}
+
+/* Timeline bar interactivity */
+.timeline-bar {
+    transition: filter 0.15s ease, box-shadow 0.15s ease;
+}
+.timeline-bar:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+}
+/* Highlight a valid drop target while dragging a dependency */
+.timeline-row.droppable {
+    background-color: color-mix(in srgb, var(--joplin-selected-color) 14%, transparent);
+}
+.timeline-row.droppable .timeline-bar {
+    outline: 2px dashed var(--joplin-selected-color);
+    outline-offset: 2px;
+}
+/*
+ * Dependency connection handles sit outside the bar ends (clear of the resize edges)
+ * and stay subtle until the row is hovered or a dependency drag is in progress, so the
+ * resize vs. link affordances never compete.
+ */
+.dep-handle {
+    opacity: 0.45;
+}
+.timeline-row:hover .dep-handle {
+    opacity: 1;
+}
+.timeline-body.linking .dep-handle {
+    opacity: 1;
 }
 
 .task-meta {

@@ -11,10 +11,18 @@ interface TaskContextMenuProps {
     onExpandSubtasks?: () => void;
 }
 
+/**
+ * Floating context menu for a task, positioned at the given coordinates and offering
+ * edit, text-edit, delete, and optional expand-subtasks actions. Closes on an outside
+ * click.
+ */
 const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ x, y, onClose, onGuiEdit, onTextEdit, onDelete, onExpandSubtasks }) => {
     const menuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        /**
+         * Closes the menu when a mousedown occurs outside of its bounds.
+         */
         const handleClickOutside = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
                 onClose();
@@ -85,7 +93,7 @@ const TaskContextMenu: React.FC<TaskContextMenuProps> = ({ x, y, onClose, onGuiE
             </button>
             <div style={{ borderTop: '1px solid var(--joplin-divider-color)', margin: '5px 0' }}></div>
             <button 
-                style={{ ...itemStyle, color: 'var(--joplin-color-error, #d32f2f)' }} 
+                style={{ ...itemStyle, color: 'var(--prj-danger)' }}
                 onClick={(e) => { e.stopPropagation(); onDelete(); onClose(); }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--joplin-background-color-hover3)'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}

@@ -76,7 +76,7 @@ const InfoView: React.FC = () => {
                 <h3 style={{ color: 'var(--text-color)', fontSize: '1.4rem' }}>📋 Views</h3>
                 <ul style={{ paddingLeft: '25px' }}>
                     <li style={{ marginBottom: '12px' }}><strong>Kanban:</strong> Visualize your workflow. Drag and drop cards between "To Do", "In Progress", and "Done". Moving a task to "Done" automatically completes all its sub-tasks.</li>
-                    <li style={{ marginBottom: '12px' }}><strong>Timeline:</strong> A temporal view of your tasks from creation to deadline. The <span style={{color: '#ff4757', fontWeight: 'bold'}}>red vertical line</span> indicates the current day.</li>
+                    <li style={{ marginBottom: '12px' }}><strong>Timeline:</strong> A temporal view of your tasks from creation to deadline. The <span style={{color: 'var(--prj-today)', fontWeight: 'bold'}}>red vertical line</span> indicates the current day.</li>
                     <li style={{ marginBottom: '12px' }}><strong>List:</strong> A professional tabular view of all active tasks, sorted by urgency and due date.</li>
                     <li style={{ marginBottom: '12px' }}><strong>Wiki:</strong> A fully-featured documentation reader with rich Markdown support.</li>
                 </ul>
@@ -134,8 +134,8 @@ const InfoView: React.FC = () => {
                 <h3 style={{ color: 'var(--text-color)', fontSize: '1.4rem' }}>⏰ Urgency & Deadlines</h3>
                 <p>The dashboard helps you stay on top of deadlines with visual cues in all views (Kanban, Timeline, List):</p>
                 <ul style={{ paddingLeft: '25px', marginTop: '10px' }}>
-                    <li style={{ marginBottom: '8px' }}><span style={{ color: '#e74c3c', fontWeight: 'bold' }}>Red (Overdue):</span> Tasks that have passed their due date and are not yet completed.</li>
-                    <li style={{ marginBottom: '8px' }}><span style={{ color: '#e67e22', fontWeight: 'bold' }}>Orange (Approaching):</span> Tasks due soon. The warning threshold is configurable in the plugin settings (default: 7 days).</li>
+                    <li style={{ marginBottom: '8px' }}><span style={{ color: 'var(--prj-overdue)', fontWeight: 'bold' }}>Red (Overdue):</span> Tasks that have passed their due date and are not yet completed.</li>
+                    <li style={{ marginBottom: '8px' }}><span style={{ color: 'var(--prj-approaching)', fontWeight: 'bold' }}>Orange (Approaching):</span> Tasks due soon. The warning threshold is configurable in the plugin settings (default: 7 days).</li>
                 </ul>
             </section>
 
@@ -172,7 +172,7 @@ const InfoView: React.FC = () => {
                 <ul style={{ paddingLeft: '25px', marginTop: '10px' }}>
                     <li style={{ marginBottom: '8px' }}><strong>Common Property:</strong>
                         <ul style={{ paddingLeft: '20px', marginTop: '5px' }}>
-                            <li><code>"name"</code> <span style={{fontSize: '0.85rem', color: '#e74c3c', border: '1px solid #e74c3c', borderRadius: '4px', padding: '0 4px'}}>REQUIRED</span>: The title of the notebook or note.</li>
+                            <li><code>"name"</code> <span style={{fontSize: '0.85rem', color: 'var(--prj-overdue)', border: '1px solid var(--prj-overdue)', borderRadius: '4px', padding: '0 4px'}}>REQUIRED</span>: The title of the notebook or note.</li>
                         </ul>
                     </li>
                     <li style={{ marginBottom: '8px' }}><strong>Notebook Node:</strong>

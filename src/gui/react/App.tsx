@@ -42,6 +42,10 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        /**
+         * Detects the active Joplin theme from the editor text color and applies the
+         * matching color scheme and theme classes to the document.
+         */
         const updateTheme = () => {
             const textColor = getComputedStyle(document.body).getPropertyValue('--joplin-color').trim();
             let isDarkTheme = false;
@@ -62,7 +66,7 @@ const App: React.FC = () => {
             }
             
             const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-            // If text is bright (> 128), it's a Dark Theme.
+            // Bright editor text indicates a dark theme.
             if (brightness > 128) isDarkTheme = true;
 
             document.documentElement.style.colorScheme = isDarkTheme ? 'dark' : 'light';
@@ -97,8 +101,8 @@ const App: React.FC = () => {
     }, [fetchData]);
 
     /**
-     * Effect to validate the selected project filter against the available projects.
-     * Resets to 'all' if the selected project is deleted or no longer available.
+     * Validates the selected project filter against the available projects and falls
+     * back to 'all' when the selected project is no longer present.
      */
     useEffect(() => {
         if (projectFilter === 'all') return;
@@ -109,6 +113,10 @@ const App: React.FC = () => {
         }
     }, [data.projects, projectFilter]);
 
+    /**
+     * Opens the task creation dialog, pre-selecting the active project filter when one
+     * is set, then refreshes the dashboard data. Concurrent invocations are ignored.
+     */
     const handleOpenCreateTaskDialog = async () => {
         if (isDialogOpen.current) return;
         isDialogOpen.current = true;
@@ -125,6 +133,11 @@ const App: React.FC = () => {
         }
     };
 
+    /**
+     * Opens the edit dialog for a task and refreshes the dashboard data afterwards.
+     * Concurrent invocations are ignored.
+     * @param task The task to edit.
+     */
     const handleOpenEditTaskDialog = async (task: Task) => {
         if (isDialogOpen.current) return;
         isDialogOpen.current = true;
@@ -138,6 +151,9 @@ const App: React.FC = () => {
         }
     };
 
+    /**
+     * Triggers a Joplin synchronization.
+     */
     const handleSync = async () => {
         try {
             await window.webviewApi.postMessage({ name: 'synchronize' });
@@ -146,6 +162,11 @@ const App: React.FC = () => {
         }
     };
 
+    /**
+     * Sends the appropriate layout command to Joplin for toggling the sidebar, note
+     * list, or menu bar, or for resetting the layout.
+     * @param type The layout action to perform.
+     */
     const handleToggleLayout = async (type: 'sideBar' | 'noteList' | 'menuBar' | 'reset') => {
         try {
             let messageName = '';
@@ -159,6 +180,13 @@ const App: React.FC = () => {
             console.error(`Error handling layout ${type}:`, error);
         }
     };
+    /**
+     * Optimistically updates a task's status in local state, marking all its subtasks
+     * complete when moving to 'done' and incomplete when leaving 'done', then persists
+     * the change to the backend and refetches on failure.
+     * @param taskId The ID of the task whose status changes.
+     * @param newStatus The new status value.
+     */
     const handleUpdateStatus = async (taskId: string, newStatus: string) => {
         const updatedTasks = data.tasks.map(t => {
             if (t.id === taskId) {
@@ -182,11 +210,17 @@ const App: React.FC = () => {
         }
     };
 
+    /**
+     * Optimistically updates the completion state of a single subtask in local state,
+     * then persists the change to the backend and refetches on failure.
+     * @param taskId The ID of the task that owns the subtask.
+     * @param subTaskIndex The index of the subtask within the task.
+     * @param checked The new completion state.
+     */
     const handleToggleSubTask = async (taskId: string, subTaskIndex: number, checked: boolean) => {
          const updatedTasks = data.tasks.map(t => {
              if (t.id === taskId) {
-                 // Use Index for optimistic update
-                 const newSubTasks = t.subTasks.map((st, i) => 
+                 const newSubTasks = t.subTasks.map((st, i) =>
                      i === subTaskIndex ? { ...st, completed: checked } : st
                  );
                  return { ...t, subTasks: newSubTasks };
@@ -203,6 +237,10 @@ const App: React.FC = () => {
         }
     };
 
+    /**
+     * Opens the note backing a task in the Joplin editor.
+     * @param taskId The ID of the task note to open.
+     */
     const handleOpenNote = async (taskId: string) => {
         try {
             await window.webviewApi.postMessage({ name: 'openNote', payload: { taskId } });
@@ -211,8 +249,12 @@ const App: React.FC = () => {
         }
     };
 
+    /**
+     * Derives the task list shown in the views by filtering on the selected project
+     * and the urgency toggle, then sorting according to the active sort option.
+     */
     const displayedTasks = React.useMemo(() => {
-        let tasks = projectFilter === 'all' 
+        let tasks = projectFilter === 'all'
             ? data.tasks 
             : data.tasks.filter(t => t.projectId === projectFilter);
 
@@ -230,7 +272,6 @@ const App: React.FC = () => {
                 const dateA = a.dueDate ? a.dueDate : Number.MAX_VALUE;
                 const dateB = b.dueDate ? b.dueDate : Number.MAX_VALUE;
                 if (dateA !== dateB) return dateA - dateB;
-                // fallback to priority
                 return getPriorityValue(a.tags) - getPriorityValue(b.tags);
             } else if (sortOption === 'startDate') {
                 const startA = a.startDate || a.createdTime;
@@ -243,7 +284,7 @@ const App: React.FC = () => {
                 if (prioA !== prioB) return prioA - prioB;
                 return (a.dueDate || Number.MAX_VALUE) - (b.dueDate || Number.MAX_VALUE);
             } else if (sortOption === 'createdTime') {
-                return b.createdTime - a.createdTime; // Newest first
+                return b.createdTime - a.createdTime;
             }
             return 0;
         });
@@ -297,9 +338,9 @@ const App: React.FC = () => {
                         onClick={() => setShowUrgentOnly(!showUrgentOnly)} 
                         style={{ 
                             fontSize: '1rem',
-                            backgroundColor: showUrgentOnly ? '#e74c3c' : undefined,
+                            backgroundColor: showUrgentOnly ? 'var(--prj-overdue)' : undefined,
                             color: showUrgentOnly ? 'white' : undefined,
-                            borderColor: showUrgentOnly ? '#c0392b' : undefined
+                            borderColor: showUrgentOnly ? 'var(--prj-overdue)' : undefined
                         }}
                         title="Show only urgent tasks (Overdue & Approaching)"
                     >

@@ -27,6 +27,9 @@ export class TaskDashboard {
         this.projectService = new ProjectService();
     }
 
+    /**
+     * Returns the singleton instance, creating it on first access.
+     */
     public static getInstance(): TaskDashboard {
         if (!TaskDashboard.instance) {
             TaskDashboard.instance = new TaskDashboard();
@@ -132,11 +135,17 @@ export class TaskDashboard {
         });
     }
 
+    /**
+     * Makes the dashboard panel visible if it is currently hidden.
+     */
     public async show() {
         if (await joplin.views.panels.visible(this.panelHandle)) return;
         await joplin.views.panels.show(this.panelHandle);
     }
 
+    /**
+     * Toggles the visibility of the dashboard panel.
+     */
     public async toggle() {
         const isVisible = await joplin.views.panels.visible(this.panelHandle);
         await joplin.views.panels.show(this.panelHandle, !isVisible);
@@ -242,13 +251,11 @@ export class TaskDashboard {
             const subTasksStr = formData.taskSubTasks || "";
             // Process subtasks: Trim RIGHT only to preserve indentation, Filter empty, and Auto-Linkify
             const subTasks = subTasksStr.split('\n')
-                .map((s: string) => s.replace(/\s+$/, '')) // Preserve leading spaces
+                .map((s: string) => s.replace(/\s+$/, ''))
                 .filter((s: string) => s.trim().length > 0)
                 .map((s: string) => {
-                    // Regex to find http/https URLs not already linked.
-                    // 1. Negative lookbehind (?<!...) to ensure we aren't inside a markdown link ](url) or html attribute ="url"
-                    // 2. Match http/s protocol
-                    // 3. Match domain and path characters, excluding common trailing punctuation like .,;:)
+                    // Matches bare http/https URLs that are not already part of a markdown
+                    // link or an HTML attribute, stopping before common trailing punctuation.
                     const urlRegex = /(?<!\]\()(?<!=\")(?<!href=\")\b(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
                     return s.replace(urlRegex, '[$1]($1)');
                 });
@@ -349,7 +356,7 @@ export class TaskDashboard {
      * and cascades the changes to dependent tasks.
      */
     private async updateTaskDates(payload: { taskId: string, startDate: number, dueDate: number, subTasks: string[], urgency: string }) {
-        // First, fetch the original task to calculate the time delta
+        // The original task is fetched first so the time delta can be computed.
         const originalNote = await getNote(payload.taskId, ['todo_due', 'application_data']);
         let originalStart = 0;
         let originalDue = originalNote.todo_due || 0;
@@ -360,10 +367,10 @@ export class TaskDashboard {
             } catch(e) {}
         }
 
-        // Calculate delta (in ms) using the Due Date as reference point.
+        // The delta is measured against the due date as the reference point.
         const deltaMs = payload.dueDate - originalDue;
 
-        // We reuse the robust updateTask logic to ensure metadata and tags are kept in sync
+        // updateTask is reused so metadata and tags stay in sync.
         await this.updateTask(payload.taskId, {
             subTasks: payload.subTasks,
             urgency: payload.urgency,
@@ -371,17 +378,14 @@ export class TaskDashboard {
             startDate: payload.startDate
         });
 
-        // If the task was moved in time, cascade the update to dependent tasks
         if (deltaMs !== 0) {
-            // We use a set to keep track of visited nodes to prevent infinite loops (circular dependencies)
+            // A visited set guards against infinite loops caused by circular dependencies.
             const visited = new Set<string>();
             visited.add(payload.taskId);
-            
-            // In our current data model, tasks point to the task they DEPEND ON.
-            // So if Task B depends on Task A, Task B's dependsOn array contains A's ID.
-            // To cascade from A to B, we need to find all tasks that have A in their dependsOn array.
-            
-            // Re-fetch all tasks metadata via project service to find reverse dependencies
+
+            // Each task stores the IDs of the tasks it depends on, so the reverse
+            // dependencies (tasks depending on the moved one) are found by scanning
+            // every task's dependsOn array.
             try {
                 const allData = await this.projectService.getDashboardData();
                 const allTasks = allData.tasks;
@@ -390,8 +394,7 @@ export class TaskDashboard {
                 console.error("TaskDashboard: Error in cascading updates", err);
             }
         }
-        
-        // Notify the UI to refresh
+
         await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
     }
 
@@ -403,59 +406,56 @@ export class TaskDashboard {
      * @param visited Set of task IDs already updated in this chain (prevents circular loops)
      */
     private async cascadeTaskUpdate(sourceTaskId: string, deltaMs: number, allTasks: any[], visited: Set<string>) {
-        // Find all tasks that depend on the sourceTask
-        const dependentTasks = allTasks.filter(t => 
+        const dependentTasks = allTasks.filter(t =>
             t.dependsOn && Array.isArray(t.dependsOn) && t.dependsOn.some((d: any) => d.id === sourceTaskId)
         );
 
         for (const targetTask of dependentTasks) {
-            if (visited.has(targetTask.id)) continue; // Prevent circular dependencies
-            
-            // Get the specific dependency relation
+            if (visited.has(targetTask.id)) continue;
+
             const depRelation = targetTask.dependsOn.find((d: any) => d.id === sourceTaskId);
             if (!depRelation) continue;
 
             const targetStart = targetTask.startDate || targetTask.createdTime;
             const targetDue = targetTask.dueDate || targetStart;
 
-            // In standard scheduling, we usually just push the task forward/backward by the same delta.
-            // A more complex implementation would calculate exactly the gap based on FS/SS/FF/SF,
-            // but for a smooth UX, shifting by the same delta maintains the relative schedule.
-            
+            // Dependent tasks are shifted by the same delta to preserve the relative
+            // schedule; computing exact gaps per FS/SS/FF/SF type would be more precise
+            // but uniform shifting yields a smoother experience.
             const newTargetStart = targetStart > 0 ? targetStart + deltaMs : targetStart;
             const newTargetDue = targetDue > 0 ? targetDue + deltaMs : targetDue;
 
             visited.add(targetTask.id);
 
-            // Update the target task in the database
             await this.updateTask(targetTask.id, {
-                subTasks: targetTask.subTasks.map((st: any) => st.title), // Simplification: we only need titles to recreate MD, but updateTask needs string[]
+                // updateTask expects string[]; only the titles are needed to rebuild the markdown.
+                subTasks: targetTask.subTasks.map((st: any) => st.title),
                 urgency: targetTask.tags.find((t: string) => ['high','medium','normal','low'].includes(t.toLowerCase())) || 'normal',
                 dueDate: newTargetDue,
                 startDate: newTargetStart
             });
 
-            // Recurse to update tasks that depend on this target task
             await this.cascadeTaskUpdate(targetTask.id, deltaMs, allTasks, visited);
         }
     }
 
     /**
-     * Updates the task's completion status and synchronizes subtask checkboxes.     * Also updates status tags (e.g., 'done', 'in_progress').
+     * Updates the completion status of a task, synchronizes its subtask checkboxes,
+     * and updates its status tags.
      */
     private async updateTaskStatus(payload: { taskId: string, newStatus: string }) {
         const { taskId, newStatus } = payload;
-        
+
         const note = await getNote(taskId, ['body', 'todo_completed']);
         const isCompleted = newStatus === 'done';
-        const wasCompleted = !!note.todo_completed; // Check if it was previously completed
-        
+        const wasCompleted = !!note.todo_completed;
+
         const updates: any = {
-            todo_completed: isCompleted ? Date.now() : 0 
+            todo_completed: isCompleted ? Date.now() : 0
         };
 
-        // Only update subtasks if we are entering 'done' state OR leaving 'done' state.
-        // If moving between 'todo' and 'in_progress', leave subtasks as they are.
+        // Subtasks are only synced when entering or leaving the 'done' state;
+        // transitions between 'todo' and 'in_progress' leave them untouched.
         if (isCompleted || wasCompleted) {
             const newBody = this.noteParser.updateAllSubTasks(note.body, isCompleted);
             if (newBody !== note.body) {
@@ -510,7 +510,7 @@ export class TaskDashboard {
      */
     private async toggleSubTask(payload: { taskId: string, subTaskIndex: number, checked: boolean }) {
         const note = await getNote(payload.taskId, ['body']);
-        // Use Index instead of Title for robustness
+        // Subtasks are addressed by index rather than title to stay robust against duplicate titles.
         const newBody = this.noteParser.updateSubTaskStatus(note.body, payload.subTaskIndex, payload.checked);
         
         if (newBody !== note.body) {

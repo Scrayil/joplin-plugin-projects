@@ -68,6 +68,10 @@
 
     const closeBtn = expandedHeader.querySelector('.subtasks-close-btn');
 
+    /**
+     * Toggles the subtask editor between its inline layout and a fullscreen overlay,
+     * adjusting the relevant elements and re-rendering the list.
+     */
     function toggleExpand() {
         const dialogRoot = document.querySelector('.dialog-root');
         const isExpanded = subtaskContainer.classList.contains('subtasks-expanded-overlay');
@@ -127,8 +131,6 @@
      * Updates the hidden input value used for form submission.
      */
     function serialize() {
-        // Convert objects to indented markdown lines
-        // 2 spaces per level
         const lines = subTasks.map(t => {
             const indent = '  '.repeat(t.level || 0);
             return `${indent}- [ ] ${t.title}`;
@@ -140,7 +142,6 @@
         const lines = hiddenInput.value.split('\n');
         lines.forEach(line => {
             if (!line.trim()) return;
-            // Parse indentation
             const match = line.match(/^(\s*)(?:-\s*\[[ xX]\]\s*)?(.*)$/);
             if (match) {
                 const rawIndent = match[1];
@@ -158,7 +159,7 @@
         });
     }
 
-    // -- Internal Button Hack (Existing logic) --
+    // -- Internal Add Project button bridge --
     
     /**
      * Finds the internal "Add Project" button in the dialog footer.
@@ -222,7 +223,6 @@
     function handleDragStart(e) {
         draggedIndex = parseInt(e.target.dataset.index);
         e.dataTransfer.effectAllowed = 'move';
-        // Optional: Custom drag image if needed, but default is usually fine
         e.target.style.opacity = '0.5';
     }
 
@@ -234,7 +234,6 @@
     function handleDragEnd(e) {
         e.target.style.opacity = '1';
         draggedIndex = null;
-        // Cleanup visuals
         document.querySelectorAll('.subtask-item').forEach(el => {
             el.classList.remove('drop-above', 'drop-below', 'drop-nest');
         });
@@ -259,13 +258,11 @@
 
         if (draggedIndex === null || draggedIndex === targetIndex) return;
 
-        // Visual calculation
         const rect = target.getBoundingClientRect();
         const relY = e.clientY - rect.top;
         const height = rect.height;
 
-        // Zones: Top 25% (Above), Bottom 25% (Below), Middle 50% (Nest)
-        
+        // Drop zones: top 25% inserts above, bottom 25% inserts below, the middle 50% nests.
         const targetTask = subTasks[targetIndex];
 
         if (relY < height * 0.25) {
@@ -273,9 +270,7 @@
         } else if (relY > height * 0.75) {
             target.classList.add('drop-below');
         } else {
-            // Nesting Logic
-            // 1. Can only nest if target is NOT a descendant of dragged item (avoid loops) - handled by visual check usually
-            // 2. MAX LEVEL CHECK: Cannot nest if target is already at level 6
+            // Nesting is disallowed once the target has reached the maximum depth of 6.
             if (targetTask.level < 6) {
                 target.classList.add('drop-nest');
             }
@@ -311,55 +306,49 @@
 
         if (draggedIndex === null || draggedIndex === targetIndex) return;
 
-        // Determine Action
         let action = 'nest';
         if (target.classList.contains('drop-above')) action = 'above';
         else if (target.classList.contains('drop-below')) action = 'below';
 
-        // 1. Identify the moving block
         const movingBlockSize = getBlockSize(draggedIndex);
-        // Safety: ensure we don't drop inside our own block
+        // A drop targeting a position inside the moving block itself is rejected.
         if (targetIndex > draggedIndex && targetIndex < draggedIndex + movingBlockSize) {
-             return; // Cancel drop
+             return;
         }
 
-        // 2. Extract the moving block (Remove from array)
         const itemsToMove = subTasks.splice(draggedIndex, movingBlockSize);
         const rootItem = itemsToMove[0];
 
-        // 3. Adjust Target Index
-        // If we removed items *before* the target, the target's index has shifted down.
+        // Removing items located before the target shifts the target index down.
         let actualTargetIndex = targetIndex;
         if (draggedIndex < targetIndex) {
             actualTargetIndex -= movingBlockSize;
         }
         const targetItem = subTasks[actualTargetIndex];
 
-        // 4. Calculate Target Block Size (Crucial for Nest/Below)
-        // We calculate this *after* removal to get the current state of the target in the list
+        // The target block size is measured after removal to reflect the current list state.
         const targetBlockSize = getBlockSize(actualTargetIndex);
 
-        // 5. Determine Insertion Index & Level
         let insertIndex;
         let levelDiff;
         let resetToRoot = false;
 
-        // Special Logic for Max Level (6) targets
+        // At the maximum depth a nest falls back to a sibling, and a below-drop breaks back to root.
         if (targetItem.level >= 6) {
             if (action === 'nest') {
-                action = 'below'; // Fallback to sibling
+                action = 'below';
             } else if (action === 'below') {
-                resetToRoot = true; // Break out to root
+                resetToRoot = true;
             }
         }
 
         if (action === 'nest') {
-            // NEST: Insert AFTER target's entire block (append as last child)
+            // Nesting appends the block after the target's whole subtree as its last child.
             insertIndex = actualTargetIndex + targetBlockSize;
             levelDiff = (targetItem.level + 1) - rootItem.level;
 
         } else if (action === 'below') {
-            // BELOW: Insert AFTER target's entire block (append as next sibling)
+            // A below-drop appends the block after the target's whole subtree as a sibling.
             insertIndex = actualTargetIndex + targetBlockSize;
             if (resetToRoot) {
                 levelDiff = 0 - rootItem.level;
@@ -367,16 +356,13 @@
                 levelDiff = targetItem.level - rootItem.level;
             }
 
-        } else { // action === 'above'
-            // ABOVE: Insert AT target index (before target)
+        } else {
+            // An above-drop inserts the block at the target index, before the target.
             insertIndex = actualTargetIndex;
             levelDiff = targetItem.level - rootItem.level;
         }
 
-        // 6. Apply Level Change
         itemsToMove.forEach(t => t.level += levelDiff);
-
-        // 7. Insert
         subTasks.splice(insertIndex, 0, ...itemsToMove);
 
         renderList();
@@ -408,12 +394,11 @@
      * Builds a hierarchical tree using <details> and <summary> for expandable cards.
      */
     function renderList() {
-        // Ensure hierarchy is valid before rendering
         normalizeLevels();
 
         list.innerHTML = '';
-        
-        // Build Tree from flat array
+
+        // A nesting tree is reconstructed from the flat list using a level-based stack.
         const tree = [];
         const stack = [];
 
@@ -430,33 +415,36 @@
             stack.push({ node, level: t.level });
         });
 
+        /**
+         * Recursively builds the DOM elements for a tree node and its children,
+         * wrapping nodes with children in an expandable details card and wiring the
+         * drag-and-drop handlers.
+         * @param {object} node The tree node to render.
+         * @returns {HTMLLIElement} The list item element representing the node.
+         */
         function createNodeElements(node) {
             const hasChildren = node.children.length > 0;
-            
+
             const container = document.createElement('li');
             container.className = 'subtask-node-container';
             container.style.listStyle = 'none';
-            
-            // The droppable/draggable target
+
             const dropTarget = document.createElement('div');
             dropTarget.className = 'subtask-item';
             dropTarget.dataset.index = node.index;
             dropTarget.draggable = true;
 
-            // Drag Handle
             const dragHandle = document.createElement('span');
             dragHandle.className = 'drag-handle';
             dragHandle.textContent = '⋮⋮';
             dropTarget.appendChild(dragHandle);
 
-            // Title
             const span = document.createElement('span');
             span.textContent = node.title;
             span.title = node.title;
             span.style.flex = '1';
             dropTarget.appendChild(span);
 
-            // Remove Button
             const btnRemove = document.createElement('button');
             btnRemove.type = 'button';
             btnRemove.className = 'btn-remove';
@@ -464,7 +452,6 @@
             btnRemove.dataset.index = node.index;
             dropTarget.appendChild(btnRemove);
 
-            // Events on dropTarget
             dropTarget.addEventListener('dragstart', handleDragStart);
             dropTarget.addEventListener('dragover', handleDragOver);
             dropTarget.addEventListener('dragend', handleDragEnd);
@@ -474,11 +461,10 @@
                 const details = document.createElement('details');
                 details.open = true;
                 details.className = 'subtask-details-card';
-                
+
                 const summary = document.createElement('summary');
                 summary.className = 'subtask-details-summary';
-                
-                // Add chevron
+
                 const chevron = document.createElement('span');
                 chevron.textContent = '▼';
                 chevron.className = 'subtask-details-chevron';
@@ -519,8 +505,11 @@
         const isExpanded = list.classList.contains('expanded');
         const targetRows = isExpanded ? 12 : 5;
         
-        // Count total visible nodes to know how many slots are occupied
-        let visibleCount = 0;
+        /**
+         * Counts a list of tree nodes together with all of their descendants.
+         * @param {object[]} nodes The nodes to count.
+         * @returns {number} The total number of nodes in the subtrees.
+         */
         function countNodes(nodes) {
             let count = 0;
             nodes.forEach(n => {
@@ -529,7 +518,7 @@
             });
             return count;
         }
-        visibleCount = countNodes(tree);
+        const visibleCount = countNodes(tree);
 
         const remainingRows = Math.max(0, targetRows - visibleCount);
         
@@ -538,16 +527,13 @@
             emptyLi.className = 'subtask-node-container';
             emptyLi.style.listStyle = 'none';
             emptyLi.style.display = 'flex';
-            // emptyLi.style.flex = '1'; // Removed flex: 1 to prevent stretching
-            
+
             const emptyItem = document.createElement('div');
             emptyItem.className = 'subtask-item empty';
-            emptyItem.style.height = '38px'; // Fixed height
+            emptyItem.style.height = '38px';
             emptyItem.style.minHeight = '38px';
-            // emptyItem.style.flex = '1'; // Removed flex: 1 to prevent stretching
-            
-            // Add a very subtle horizontal separator line centered in the 4px flex gap.
-            // Using box-shadow with a 2px vertical offset pushes the 1px line exactly in the middle of the 4px gap!
+
+            // A box-shadow offset by 2px draws a faint 1px separator centered in the 4px gap.
             if (i < remainingRows - 1 || visibleCount + i < targetRows - 1) {
                 emptyItem.style.boxShadow = '0 2px 0 0 rgba(127, 127, 127, 0.3)';
             }
@@ -582,14 +568,13 @@
         if (e.target.classList.contains('btn-remove')) {
             e.preventDefault();
             const index = parseInt(e.target.dataset.index);
-            // Remove block (item + children)
+            // The removal spans the item together with its descendant block.
             const blockSize = getBlockSize(index);
             subTasks.splice(index, blockSize);
             renderList();
         }
     });
 
-    // Initial render
     renderList();
 
 })();

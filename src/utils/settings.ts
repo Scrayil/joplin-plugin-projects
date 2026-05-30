@@ -2,8 +2,11 @@ import joplin from "../../api";
 import {SettingItemSubType, SettingItemType} from "../../api/types";
 import {Config} from "./constants";
 
+/**
+ * Registers the plugin settings section and its individual settings: the custom
+ * wiki template file path and the approaching-deadline warning threshold in days.
+ */
 export const registerSettings = async () => {
-    // Creating a new settings' section for the plugin
     await joplin.settings.registerSection(Config.SETTINGS.PROJECT_SECTION, {
         label: 'Projects',
         iconName: 'fas fa-folder',

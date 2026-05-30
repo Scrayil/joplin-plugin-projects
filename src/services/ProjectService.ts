@@ -62,7 +62,6 @@ export class ProjectService {
     public async getDashboardData() {
         await this.loadProjectMeta();
 
-        // Resolve project root without auto-creation.
         const rootId = await getOrInitProjectRootId(false);
         
         if (!rootId) {
@@ -114,11 +113,11 @@ export class ProjectService {
             });
         }
 
-        // Include tag data in the signature to detect external tag changes.
+        // Tag content is folded into the signature so that external tag changes,
+        // which do not alter a note's updated_time, still invalidate the cache.
         const noteIds = validTodosMetadata.map(n => n.id);
         const tagsMap = await this.tagService.getTagsForNotes(noteIds);
 
-        // Create a signature based on Note Updates AND Tag content
         let tagsSignature = '';
         tagsMap.forEach((tags, id) => {
             tagsSignature += `${id}:${tags.sort().join(',')}|`;
@@ -137,8 +136,8 @@ export class ProjectService {
             return this.dashboardCache;
         }
 
-        // On cache miss, fetch full note bodies to parse subtasks.
-        // Batched to minimize UI impact.
+        // On cache miss, note bodies are fetched in batches to parse subtasks
+        // while limiting the number of concurrent API requests.
         const notesWithBody: any[] = [];
         const batchSize = 20;
         
@@ -222,26 +221,26 @@ export class ProjectService {
         
         return data;
     }
-/**
- * Persists a manual ordering of Wiki items for a specific parent.
- * 
- * @param projectId The project ID.
- * @param parentId The ID of the parent folder (or project root).
- * @param orderedIds Array of child IDs in the desired order.
- */
-public async saveWikiOrder(projectId: string, parentId: string, orderedIds: string[]) {
-    const allOrders = await this.syncService.getWikiOrders();
-    if (!allOrders[projectId]) allOrders[projectId] = {};
+    /**
+     * Persists a manual ordering of Wiki items for a specific parent.
+     *
+     * @param projectId The project ID.
+     * @param parentId The ID of the parent folder (or project root).
+     * @param orderedIds Array of child IDs in the desired order.
+     */
+    public async saveWikiOrder(projectId: string, parentId: string, orderedIds: string[]) {
+        const allOrders = await this.syncService.getWikiOrders();
+        if (!allOrders[projectId]) allOrders[projectId] = {};
 
-    allOrders[projectId][parentId] = orderedIds;
+        allOrders[projectId][parentId] = orderedIds;
 
-    await this.syncService.saveWikiOrders(allOrders);
-}
+        await this.syncService.saveWikiOrders(allOrders);
+    }
 
-/**
- * Forcefully invalidates the dashboard cache.
-...
-     * Useful when changes (like tag updates) might not be reflected in the note's updated_time.
+    /**
+     * Invalidates the dashboard cache and the SyncService cache, forcing a full
+     * data fetch on the next request even when note update timestamps are unchanged,
+     * such as after tag updates.
      */
     public invalidateCache() {
         this.lastSignature = '';
@@ -265,11 +264,8 @@ public async saveWikiOrder(projectId: string, parentId: string, orderedIds: stri
         try {
             const dataFolder = await getPluginDataFolder();
             const metaPath = path.join(dataFolder, "project_meta.json");
-            
-            // Update local state first
+
             this.projectMeta[projectId] = tasksFolderId;
-            
-            // Persist to file
             await writeFileContent(metaPath, JSON.stringify(this.projectMeta, null, 2));
         } catch (error) {
             console.error("ProjectService: Error saving project meta", error);
@@ -305,32 +301,28 @@ public async saveWikiOrder(projectId: string, parentId: string, orderedIds: stri
         
         let tasksFolderId = this.projectMeta[projectId];
 
-        // Verifying if the cached folder ID still exists and is not in trash
         if (tasksFolderId) {
             try {
                 const folder = await getFolder(tasksFolderId, ['id', 'deleted_time']);
                 if (folder && !folder.deleted_time) {
                     return tasksFolderId;
                 }
-                // The folder is invalid/deleted. It must be recreated.
                 console.warn(`ProjectService: Tasks folder ${tasksFolderId} for project ${projectId} is missing/deleted. Recovering...`);
             } catch (e) {
                 console.warn(`ProjectService: cached tasks folder ${tasksFolderId} not found.`);
             }
         }
 
-        // Scanning children to see if a "Tasks" folder exists (but was not linked)
+        // An unlinked "Tasks" folder may already exist among the project children.
         const allFolders = await this.fetchAllFolders();
         const projectFolders = allFolders.filter((f: any) => f.parent_id === projectId);
         const existingTasksFolder = projectFolders.find((f: any) => f.title.includes(Config.FOLDERS.TASKS));
-        
+
         if (existingTasksFolder) {
-            // Found existing folder, relinking it
             await this.saveProjectMeta(projectId, existingTasksFolder.id);
             return existingTasksFolder.id;
         }
 
-        // Last Resort: Creating a new "Tasks" folder
         console.info(`ProjectService: Creating new Tasks folder for project ${projectId}`);
         const folderName = await this.getDefaultTasksFolderName();
         const newTasksFolder = await createNotebook(folderName, projectId);
@@ -353,7 +345,6 @@ public async saveWikiOrder(projectId: string, parentId: string, orderedIds: stri
      * @returns A promise resolving to the ordered list of WikiNodes.
      */
     public async getProjectWiki(projectId: string) {
-        // Fetch structure
         const allFolders = await this.fetchAllFolders(['id', 'parent_id', 'title']);
         let rootFolders: any[] = [];
         let rootParentId = '';
@@ -372,10 +363,9 @@ public async saveWikiOrder(projectId: string, parentId: string, orderedIds: stri
             }
         }
 
-        // Map structure
         const folderMap = new Map<string, any>();
-        
-        // Filter out "Tasks" folders globally before mapping
+
+        // Task folders are excluded since their contents belong to the dashboard, not the wiki.
         const tasksKeyword = Config.FOLDERS.TASKS;
         const filteredFolders = allFolders.filter((f: any) => !f.title.includes(tasksKeyword));
 
@@ -391,20 +381,17 @@ public async saveWikiOrder(projectId: string, parentId: string, orderedIds: stri
         };
         rootFolders.forEach(r => collectDescendants(r.id));
 
-        // Fetch notes metadata first
         const folderIds = Array.from(targetIds);
         const notesMeta = await Promise.all(folderIds.map(async (fid) => {
             return await fetchAllItems(['folders', fid, 'notes'], { fields: ['id', 'parent_id', 'title', 'is_todo'] });
         }));
         const allNotes = notesMeta.flat();
 
-        // Attach notes to folders
         allNotes.forEach((n: any) => {
             const folderNode = folderMap.get(n.parent_id);
             if (folderNode) folderNode.children.push({ ...n, type: 'note' });
         });
 
-        // Connect folders
         allFolders.forEach((f: any) => {
             if (targetIds.has(f.id)) {
                 const parent = folderMap.get(f.parent_id);
@@ -414,42 +401,17 @@ public async saveWikiOrder(projectId: string, parentId: string, orderedIds: stri
             }
         });
 
-        // Load Custom Orders from SyncService for cross-device consistency
+        // Manual orders are loaded from the SyncService to stay consistent across devices.
         const allOrders = await this.syncService.getWikiOrders();
-        const projectOrders = allOrders[projectId] || {};
 
-        // Sort children for each folder
-        const sortChildren = (parentId: string, children: any[]) => {
-            const savedOrder = projectOrders[parentId];
-            
-            if (savedOrder && Array.isArray(savedOrder)) {
-                // Manual Sort:
-                // 1. Existing items in saved order
-                // 2. New items (not in saved order) appended at the end
-                const orderedIds = new Set(savedOrder);
-                const itemsInOrder = savedOrder
-                    .map(id => children.find(c => c.id === id))
-                    .filter(c => !!c);
-                
-                const newItems = children.filter(c => !orderedIds.has(c.id));
-                // Sort new items alphabetically among themselves
-                newItems.sort((a, b) => sanitizeTitle(a.title).localeCompare(sanitizeTitle(b.title), undefined, { sensitivity: 'accent' }));
-
-                return [...itemsInOrder, ...newItems];
-            } else {
-                // Fallback: Alphabetical Sort
-                return children.sort((a: any, b: any) => {
-                    if (a.type !== b.type) return a.type === 'note' ? -1 : 1;
-                    return sanitizeTitle(a.title).localeCompare(sanitizeTitle(b.title), undefined, { sensitivity: 'accent' });
-                });
-            }
-        };
-
-        // Flatten Tree (DFS) to create the "Book" sequence
         const flatList: any[] = [];
+        /**
+         * Appends a node and its ordered descendants to the flat list using a
+         * depth-first traversal, applying any saved manual ordering and otherwise
+         * sorting alphabetically with notes before folders.
+         */
         const traverse = (node: any, level: number, parentId: string, currentProjectRootId: string) => {
-            // Add the node itself
-            flatList.push({ 
+            flatList.push({
                 id: node.id, 
                 title: node.title, 
                 type: node.type, 
@@ -459,7 +421,7 @@ public async saveWikiOrder(projectId: string, parentId: string, orderedIds: stri
             });
 
             if (node.children) {
-                // If we are at root level in 'all' view, the node itself IS the project root
+                // In the 'all' view each top-level node is itself a project root.
                 const projectRootId = (currentProjectRootId === 'all') ? node.id : currentProjectRootId;
                 const projectOrdersForNode = allOrders[projectRootId] || {};
                 const savedOrder = projectOrdersForNode[node.id];
@@ -482,12 +444,11 @@ public async saveWikiOrder(projectId: string, parentId: string, orderedIds: stri
             }
         };
 
-        // Special case for root-level sorting (the projects themselves)
-        const rootChildren = projectId === 'all' 
+        // The top-level projects are ordered under the synthetic 'all' project root.
+        const rootChildren = projectId === 'all'
             ? rootFolders.map(r => folderMap.get(r.id))
             : [folderMap.get(projectId)];
-        
-        // Use 'all' as the project root for the global projects sequence
+
         const globalOrders = allOrders['all'] || {};
         const savedGlobalOrder = globalOrders[rootParentId];
 
@@ -504,13 +465,11 @@ public async saveWikiOrder(projectId: string, parentId: string, orderedIds: stri
 
         sortedRoot.forEach(r => traverse(r, 0, rootParentId, projectId));
 
-        // Fetch bodies ONLY for notes (folders are just headers)
-        // Batched processing
+        // Only notes carry a body; folders act as headers. Items are shared by
+        // reference with flatList, so mutating them here updates the returned list.
         const noteItems = flatList.filter(item => item.type === 'note');
         const batchSize = 20;
-        
-        // Map updates back to flatList via reference or ID map?
-        // Since objects in flatList are references, updating noteItems updates flatList.
+
         for (let i = 0; i < noteItems.length; i += batchSize) {
             const batch = noteItems.slice(i, i + batchSize);
             await Promise.all(batch.map(async (item) => {

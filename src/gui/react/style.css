@@ -13,6 +13,52 @@
     --primary-btn-bg: var(--joplin-selected-color);
     --column-bg: rgba(128, 128, 128, 0.1);
     --input-bg: transparent;
+
+    /*
+     * Semantic palette. Text/border hues are chosen to read on both themes, while the
+     * background variants are translucent tints that blend over the active theme color.
+     * The body.theme-* blocks below fine-tune the values that benefit from per-theme contrast.
+     */
+    --prj-overdue: #e74c3c;
+    --prj-overdue-bg: rgba(231, 76, 60, 0.2);
+    --prj-approaching: #e67e22;
+    --prj-approaching-bg: rgba(230, 126, 34, 0.2);
+    --prj-priority-high: #e74c3c;
+    --prj-priority-high-bg: rgba(231, 76, 60, 0.15);
+    --prj-priority-medium: #e67e22;
+    --prj-priority-medium-bg: rgba(230, 126, 34, 0.15);
+    --prj-priority-low: #3498db;
+    --prj-priority-low-bg: rgba(52, 152, 219, 0.15);
+    --prj-status-todo: #7f8c8d;
+    --prj-status-inprogress: #3498db;
+    --prj-status-inprogress-bg: rgba(52, 152, 219, 0.1);
+    --prj-today: #ff4757;
+    --prj-project-tag: #e69500;
+    --prj-danger: var(--joplin-color-error, #d32f2f);
+
+    /*
+     * Per-project Gantt bar color: the hue is derived deterministically from the project
+     * ID, while saturation and lightness are theme-driven so every bar stays legible and
+     * harmonious on the active Joplin theme.
+     */
+    --prj-bar-saturation: 60%;
+    --prj-bar-lightness: 50%;
+}
+
+/* Brighter hues and lighter bars keep contrast on dark backgrounds. */
+body.theme-dark {
+    --prj-priority-high: #ff6b5e;
+    --prj-priority-low: #5dade2;
+    --prj-status-inprogress: #5dade2;
+    --prj-project-tag: #ffb454;
+    --prj-bar-saturation: 65%;
+    --prj-bar-lightness: 62%;
+}
+
+/* Deeper hues and darker bars keep contrast on light backgrounds. */
+body.theme-light {
+    --prj-bar-saturation: 62%;
+    --prj-bar-lightness: 44%;
 }
 
 /* Joplin Dark Theme overrides (automatically handled by Joplin injecting vars, but we ensure usage) */
@@ -286,7 +332,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .task-project-tag {
-    color: orange;
+    color: var(--prj-project-tag);
     font-weight: bold;
     font-size: 0.95rem;
     margin-right: 6px;
@@ -338,29 +384,29 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .task-card.overdue {
-    background-color: rgba(231, 76, 60, 0.2) !important;
+    background-color: var(--prj-overdue-bg) !important;
     border-color: rgba(231, 76, 60, 0.4) !important;
 }
 
 .task-card.approaching {
-    background-color: rgba(230, 126, 34, 0.2) !important;
+    background-color: var(--prj-approaching-bg) !important;
     border-color: rgba(230, 126, 34, 0.4) !important;
 }
 
 .list-row.overdue {
-    background-color: rgba(231, 76, 60, 0.2) !important;
+    background-color: var(--prj-overdue-bg) !important;
 }
 
 .list-row.approaching {
-    background-color: rgba(230, 126, 34, 0.2) !important;
+    background-color: var(--prj-approaching-bg) !important;
 }
 
 .timeline-row.overdue {
-    background-color: rgba(231, 76, 60, 0.2) !important;
+    background-color: var(--prj-overdue-bg) !important;
 }
 
 .timeline-row.approaching {
-    background-color: rgba(230, 126, 34, 0.2) !important;
+    background-color: var(--prj-approaching-bg) !important;
 }
 
 .task-meta {
@@ -382,12 +428,12 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .task-card.overdue .task-due {
-    color: #e74c3c; /* Red only when overdue */
+    color: var(--prj-overdue);
     opacity: 1;
 }
 
 .task-card.approaching .task-due {
-    color: #d35400; /* Orange when approaching */
+    color: var(--prj-approaching);
     opacity: 1;
 }
 
@@ -399,19 +445,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     height: 100%;
     width: 100%;
     overflow-y: auto;
-}
-
-.create-task-form {
-    width: 100%;
-    max-width: 800px;
-    padding: 30px;
-    background: var(--joplin-background-color);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    color: var(--text-color);
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    margin-top: 20px;
-    margin-bottom: 20px;
 }
 
 .select-wrapper {

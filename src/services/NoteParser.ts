@@ -75,27 +75,24 @@ export class NoteParser {
         // Apply change to target
         tasks[targetIndex].completed = checked;
 
-        // 1. Cascade Down (Parent -> Children)
-        // Only propagate if we are CHECKING the task. 
+        // Cascade down: checking a task also checks its descendants.
         if (checked) {
             for (let i = targetIndex + 1; i < tasks.length; i++) {
                 if (tasks[i].level > tasks[targetIndex].level) {
                     tasks[i].completed = true;
                 } else {
-                    break; // Stop when we hit a sibling or parent
+                    break;
                 }
             }
         }
 
-        // 2. Cascade Up (Safety Uncheck)
-        // If we are UNCHECKING a child, the parent cannot be considered done.
-        // We traverse up and uncheck all parents.
+        // Cascade up: unchecking a task unchecks its ancestors, since a parent
+        // cannot remain complete while one of its children is incomplete.
         if (!checked) {
             let currentLevel = tasks[targetIndex].level;
             let currentIndex = targetIndex;
 
             while (currentLevel > 0) {
-                // Find parent
                 let parentIndex = -1;
                 for (let i = currentIndex - 1; i >= 0; i--) {
                     if (tasks[i].level < currentLevel) {
@@ -106,10 +103,8 @@ export class NoteParser {
 
                 if (parentIndex === -1) break;
 
-                // Uncheck parent
                 tasks[parentIndex].completed = false;
 
-                // Move up
                 currentIndex = parentIndex;
                 currentLevel = tasks[parentIndex].level;
             }

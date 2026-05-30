@@ -15,6 +15,10 @@ export class TagService {
         this.loadTagMeta();
     }
 
+    /**
+     * Loads the persisted tag-type to tag-ID mapping from "tag_meta.json" into memory.
+     * Runs at most once per instance and leaves the mapping empty on failure.
+     */
     private async loadTagMeta() {
         if (this.metaLoaded) return;
         try {
@@ -32,6 +36,9 @@ export class TagService {
         }
     }
 
+    /**
+     * Persists the in-memory tag-type to tag-ID mapping to "tag_meta.json".
+     */
     private async saveTagMeta() {
         try {
             const dataFolder = await getPluginDataFolder();
@@ -56,7 +63,6 @@ export class TagService {
                 // Check if tag still exists
                 const tag = await getTag(tagId, ['id']);
                 if (tag) {
-                    // Tag exists, we use it regardless of its current title
                     return tagId;
                 }
             } catch (e) {
@@ -80,6 +86,13 @@ export class TagService {
         return tagId;
     }
 
+    /**
+     * Retrieves the tag titles associated with each of the given notes, processing
+     * them in fixed-size batches. Notes whose tag lookup fails are omitted from the
+     * result.
+     * @param noteIds The IDs of the notes whose tags are retrieved.
+     * @returns A map from note ID to its array of tag titles.
+     */
     public async getTagsForNotes(noteIds: string[]): Promise<Map<string, string[]>> {
         const noteTagsMap = new Map<string, string[]>();
         const batchSize = 10;
@@ -112,8 +125,14 @@ export class TagService {
         };
     }
 
+    /**
+     * Sets the priority of a task to a single tag by removing every priority tag
+     * (high, medium, low) and then applying the one matching the given urgency.
+     * An unrecognized urgency defaults to medium.
+     * @param taskId The ID of the task note to update.
+     * @param urgency The target urgency: "high", "low", or any other value for medium.
+     */
     public async updatePriorityTags(taskId: string, urgency: string): Promise<void> {
-        // Resolve all priority tag IDs to ensure we clean up correctly
         const highId = await this.getEffectiveTagId('HIGH', Config.TAGS.HIGH);
         const mediumId = await this.getEffectiveTagId('MEDIUM', Config.TAGS.MEDIUM);
         const lowId = await this.getEffectiveTagId('LOW', Config.TAGS.LOW);
@@ -134,6 +153,12 @@ export class TagService {
         await addTagToNote(targetId, taskId);
     }
 
+    /**
+     * Synchronizes the in-progress status tag of a task, adding it when the new
+     * status is "in_progress" and removing it otherwise.
+     * @param taskId The ID of the task note to update.
+     * @param newStatus The new status of the task.
+     */
     public async updateStatusTags(taskId: string, newStatus: string): Promise<void> {
         const inProgressId = await this.getEffectiveTagId('IN_PROGRESS', Config.TAGS.IN_PROGRESS);
 

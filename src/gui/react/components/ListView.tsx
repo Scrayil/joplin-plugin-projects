@@ -18,8 +18,13 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
     const activeTasks = tasks
         .filter(t => t.status !== 'done');
 
+    /**
+     * Renders the priority tag of a task as a colored label, or a dash when no priority
+     * tag is present.
+     * @param tags The tags of the task.
+     */
     const getPriorityDisplay = (tags: string[]) => {
-        const priorityTag = tags.find(t => 
+        const priorityTag = tags.find(t =>
             t.toLowerCase().includes('high') || 
             t.toLowerCase().includes('medium') || 
             t.toLowerCase().includes('normal') || 
@@ -29,22 +34,27 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
         if (!priorityTag) return '-';
 
         let color = 'inherit';
-        if (priorityTag.toLowerCase().includes('high')) color = '#e74c3c';
-        else if (priorityTag.toLowerCase().includes('medium') || priorityTag.toLowerCase().includes('normal')) color = '#f39c12';
-        else if (priorityTag.toLowerCase().includes('low')) color = '#3498db';
+        if (priorityTag.toLowerCase().includes('high')) color = 'var(--prj-priority-high)';
+        else if (priorityTag.toLowerCase().includes('medium') || priorityTag.toLowerCase().includes('normal')) color = 'var(--prj-priority-medium)';
+        else if (priorityTag.toLowerCase().includes('low')) color = 'var(--prj-priority-low)';
 
         return <span style={{ color, fontWeight: 'bold' }}>{priorityTag}</span>;
     };
 
+    /**
+     * Renders a colored status badge for a task, distinguishing the in-progress state
+     * from the default to-do state.
+     * @param status The status of the task.
+     */
     const getStatusDisplay = (status: string) => {
         let label = 'To Do';
-        let color = '#7f8c8d';
-        let bg = 'rgba(127, 140, 141, 0.1)';
+        let color = 'var(--prj-status-todo)';
+        let bg = 'var(--column-bg)';
 
         if (status === 'in_progress') {
             label = 'In Progress';
-            color = '#3498db';
-            bg = 'rgba(52, 152, 219, 0.1)';
+            color = 'var(--prj-status-inprogress)';
+            bg = 'var(--prj-status-inprogress-bg)';
         }
 
         return (
@@ -62,10 +72,19 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
         );
     };
 
+    /**
+     * Requests deletion of a task from the backend.
+     * @param task The task to delete.
+     */
     const handleDeleteTask = (task: Task) => {
         window.webviewApi.postMessage({ name: 'deleteTask', payload: { task } });
     };
 
+    /**
+     * Opens the context menu for a task at the cursor position.
+     * @param e The triggering mouse event.
+     * @param task The task associated with the menu.
+     */
     const handleContextMenu = (e: React.MouseEvent, task: Task) => {
         e.preventDefault();
         setContextMenu({ x: e.clientX, y: e.clientY, task });
@@ -114,12 +133,12 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
                                     <td style={{ 
                                         padding: '12px 10px', 
                                         borderRight: '1px solid var(--joplin-divider-color)',
-                                        maxWidth: '120px', /* Limit width */
+                                        maxWidth: '120px',
                                         whiteSpace: 'nowrap',
                                         overflow: 'hidden',
                                         textOverflow: 'ellipsis'
                                     }}>
-                                        <span style={{ color: 'orange', fontWeight: 'bold', fontSize: '1rem' }}>[{task.projectName}]</span>
+                                        <span style={{ color: 'var(--prj-project-tag)', fontWeight: 'bold', fontSize: '1rem' }}>[{task.projectName}]</span>
                                     </td>
                                     <td style={{ 
                                         padding: '12px 10px', 
@@ -140,9 +159,9 @@ const ListView: React.FC<ListViewProps> = ({ tasks, onOpenNote, onEditTask }) =>
                                     </td>
                                     <td style={{ padding: '12px 10px', fontSize: '0.85rem' }}>
                                         {task.dueDate && task.dueDate > 0 ? (
-                                            <span style={{ 
-                                                color: isOverdue ? '#e74c3c' : (isApproaching ? '#e67e22' : 'inherit'), 
-                                                fontWeight: (isOverdue || isApproaching) ? 'bold' : 'normal' 
+                                            <span style={{
+                                                color: isOverdue ? 'var(--prj-overdue)' : (isApproaching ? 'var(--prj-approaching)' : 'inherit'),
+                                                fontWeight: (isOverdue || isApproaching) ? 'bold' : 'normal'
                                             }}>
                                                 {formatDate(task.dueDate, false)}
                                             </span>

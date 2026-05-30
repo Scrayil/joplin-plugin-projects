@@ -22,10 +22,9 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
     
     const [contextMenu, setContextMenu] = React.useState<{x: number, y: number, task: Task} | null>(null);
 
-    // Memoize parser to avoid re-creation on every render
     const mdParser = React.useMemo(() => new MarkdownIt({
-        html: false, // Security: Disable HTML input, only allow Markdown syntax
-        linkify: true, // Auto-convert URLs to links
+        html: false, // Disabling raw HTML input prevents injection from note content.
+        linkify: true,
         typographer: true
     }), []);
 
@@ -81,12 +80,12 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
         return (
             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '5px', marginBottom: '8px' }}>
                 {tags.map((tag, i) => {
-                    let bg = '#eee';
-                    let color = '#333';
+                    let bg = 'var(--column-bg)';
+                    let color = 'var(--text-color)';
                     const lowerTag = tag.toLowerCase();
-                    if (lowerTag.includes('high')) { bg = '#ffebee'; color = '#c62828'; }
-                    else if (lowerTag.includes('medium') || lowerTag.includes('normal')) { bg = '#fff8e1'; color = '#f57f17'; }
-                    else if (lowerTag.includes('low')) { bg = '#e3f2fd'; color = '#1565c0'; }
+                    if (lowerTag.includes('high')) { bg = 'var(--prj-priority-high-bg)'; color = 'var(--prj-priority-high)'; }
+                    else if (lowerTag.includes('medium') || lowerTag.includes('normal')) { bg = 'var(--prj-priority-medium-bg)'; color = 'var(--prj-priority-medium)'; }
+                    else if (lowerTag.includes('low')) { bg = 'var(--prj-priority-low-bg)'; color = 'var(--prj-priority-low)'; }
                     return <span key={i} style={{ fontSize: '0.7rem', background: bg, color: color, padding: '2px 6px', borderRadius: '4px' }}>{tag}</span>;
                 })}
             </div>
@@ -122,6 +121,12 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
             stack.push({ node, level });
         });
 
+        /**
+         * Renders a single subtask node and, recursively, its children, wrapping nodes
+         * that have children in an expandable details card. Subtask titles are rendered
+         * as sanitized inline markdown.
+         * @param node The subtask tree node to render.
+         */
         const renderNode = (node: any) => {
             const hasChildren = node.children && node.children.length > 0;
             

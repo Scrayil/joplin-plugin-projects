@@ -9,8 +9,9 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 
 
 /**
- * Instantiates and configures the Markdown parser with extended protocol support.
- * * @returns {MarkdownIt} The configured MarkdownIt instance.
+ * Instantiates and configures the Markdown parser with task-list support and an
+ * extended link-validation scheme that accepts additional URI protocols.
+ * @returns The configured MarkdownIt instance.
  */
 const getConfiguredMdParser = (): MarkdownIt => {
     const md = new MarkdownIt({
@@ -36,6 +37,12 @@ interface WikiViewProps {
     lastUpdated: number;
 }
 
+/**
+ * Builds a nested tree from a flat list of wiki nodes by linking each node to its
+ * parent, returning the nodes that have no parent in the list as roots.
+ * @param nodes The flat list of wiki nodes.
+ * @returns The root nodes, each populated with a children array.
+ */
 const buildTree = (nodes: WikiNode[]) => {
     const tree: any[] = [];
     const map = new Map();
@@ -48,16 +55,26 @@ const buildTree = (nodes: WikiNode[]) => {
     return tree;
 };
 
-const TocLevel: React.FC<{ 
-    nodes: any[], 
-    level: number, 
+/**
+ * Recursively renders one level of the table-of-contents tree, with separate drag-and-drop
+ * zones for notes and folders and nested levels for folder children.
+ */
+const TocLevel: React.FC<{
+    nodes: any[],
+    level: number,
     parentId: string,
     projectId: string,
-    onScrollToSection: (id: string) => void 
+    onScrollToSection: (id: string) => void
 }> = ({ nodes, level, parentId, projectId, onScrollToSection }) => {
     const notes = nodes.filter(n => n.type === 'note');
     const folders = nodes.filter(n => n.type === 'folder');
 
+    /**
+     * Renders a draggable, droppable zone containing the items of a single type
+     * (notes or folders) for this level.
+     * @param items The items to render in the zone.
+     * @param type The node type the zone holds.
+     */
     const renderZone = (items: any[], type: 'note' | 'folder') => (
         <Droppable droppableId={`${type}:${parentId}`} type={`${type.toUpperCase()}_${parentId}`}>
             {(provided, snapshot) => (
@@ -158,6 +175,11 @@ const TocLevel: React.FC<{
     );
 };
 
+/**
+ * Renders the project documentation as a browsable wiki, with a draggable table of
+ * contents, sanitized and syntax-highlighted Markdown rendering, task-list toggling,
+ * and an inline media player for local video and audio resources.
+ */
 const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubTask, lastUpdated }) => {
     const [wikiData, setWikiData] = useState<WikiNode[]>([]);
     const [loading, setLoading] = useState(true);
@@ -173,6 +195,10 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
     
     useEffect(() => {
         let mounted = true;
+        /**
+         * Fetches the wiki structure for the current project, ignoring the response if
+         * the component unmounted in the meantime.
+         */
         const fetchWiki = async () => {
             if (wikiData.length === 0) setLoading(true);
             try {
@@ -186,6 +212,11 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
         return () => { mounted = false; };
     }, [projectId, lastUpdated]);
 
+    /**
+     * Reorders a note or folder within its sibling group after a drag-and-drop, updates
+     * the local wiki data, and persists the new sibling order to the backend.
+     * @param result The drop result from @hello-pangea/dnd.
+     */
     const onDragEnd = async (result: DropResult) => {
         const { destination, source } = result;
         if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) return;
@@ -193,7 +224,13 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
         const [type, parentId] = source.droppableId.split(':');
         const treeCopy = JSON.parse(JSON.stringify(wikiTree));
         let movedNodeId = '';
-        
+
+        /**
+         * Locates the sibling group identified by the drag source within the tree and
+         * moves the dragged item to its destination index, returning whether the move
+         * was applied.
+         * @param nodes The current level of nodes being searched.
+         */
         const findAndMove = (nodes: any[]): boolean => {
             const isRootLevel = (parentId === projectId || parentId === 'all' || parentId === '');
             if (nodes.length > 0 || isRootLevel) {
@@ -221,6 +258,11 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
         const rootNodes = projectId === 'all' ? treeCopy : treeCopy.filter(n => n.id === projectId);
         if (findAndMove(rootNodes)) {
             const newFlatData: WikiNode[] = [];
+            /**
+             * Flattens a node tree back into the flat wiki-data list via depth-first
+             * traversal, dropping the transient children arrays.
+             * @param nodes The nodes to flatten.
+             */
             const flatten = (nodes: any[]) => {
                 nodes.forEach(n => {
                     const { children, ...nodeData } = n;
@@ -231,6 +273,11 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
             flatten(rootNodes);
             setWikiData(newFlatData);
 
+            /**
+             * Resolves the top-level project ID that owns a node by walking up the parent
+             * chain until a level-0 node is reached.
+             * @param nodeId The node whose owning project is resolved.
+             */
             const findActualProjectId = (nodeId: string): string => {
                 const node = newFlatData.find(n => n.id === nodeId);
                 if (!node) return nodeId;
@@ -250,6 +297,10 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
         }
     };
 
+    /**
+     * Smoothly scrolls the reader pane to the wiki section with the given node ID.
+     * @param id The node ID whose section is scrolled into view.
+     */
     const scrollToSection = (id: string) => {
         const el = document.getElementById(`wiki-section-${id}`);
         if (el && contentRef.current) {
@@ -277,6 +328,11 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
         }
     }, [loading, wikiData]);
 
+    /**
+     * Handles clicks within the rendered wiki content, opening local video and audio
+     * resources in the inline media player and forwarding task-list checkbox toggles.
+     * @param e The click event.
+     */
     const handleContentClick = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
         if (target.tagName === 'A') {
@@ -309,9 +365,8 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
                 const subTaskIndex = checkboxes.indexOf(checkbox);
                 
                 if (subTaskIndex !== -1 && onToggleSubTask) {
-                    // Note: Prevent default behavior because we handle the check state in backend 
-                    // and wait for the update to trickle back through Joplin's watcher.
-                    // However, we can also let it happen for visual immediate feedback.
+                    // The toggle is forwarded to the backend, which persists the change
+                    // and pushes the updated state back through Joplin's note watcher.
                     onToggleSubTask(noteId, subTaskIndex, checkbox.checked);
                 }
             }

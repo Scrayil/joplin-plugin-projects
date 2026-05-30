@@ -27,6 +27,13 @@ const logger = Logger.create('Projects: Projects');
 // Cache to prevent repetitive API scanning for the anchor note during polling
 let anchorValidatedForId: string | null = null;
 
+/**
+ * Recursively creates the notebooks and notes described by a wiki template node
+ * under the given parent folder.
+ * @param projectStructure The template node to materialize.
+ * @param parent_id The ID of the folder under which the node is created.
+ * @returns The ID of the created Tasks folder if one exists in the subtree, otherwise null.
+ */
 async function createProjectNotebooksAndNotes(projectStructure: WikiNode, parent_id: string): Promise<string | null> {
     const currentNotebookId = (await createNotebook(projectStructure.name, parent_id)).id;
     let tasksFolderId: string | null = null;
@@ -65,8 +72,7 @@ async function ensureAnchorNote(folderId: string) {
             logger.info("Anchor note not found in root folder. Creating migration anchor.");
             await createNote(Config.ANCHOR.TITLE, Config.ANCHOR.BODY, false, folderId);
         }
-        
-        // Cache the validation success
+
         anchorValidatedForId = folderId;
     } catch (error) {
         logger.error("Error ensuring anchor note:", error);
@@ -79,22 +85,20 @@ async function ensureAnchorNote(folderId: string) {
  */
 async function findProjectRootViaAnchor(): Promise<string | null> {
     try {
-        // Search by exact title. 
         const response = await searchNotes(`title:"${Config.ANCHOR.TITLE}"`, ['id', 'parent_id', 'title']);
 
         if (response.items.length > 0) {
-            // We might find multiple (trash vs active), so we check them
+            // Several matches can coexist (active and trashed); the first match whose
+            // parent folder is active wins.
             for (const anchor of response.items) {
                 try {
-                    // Check if the parent folder is valid and NOT in trash
                     const parent = await getFolder(anchor.parent_id, ['id', 'deleted_time']);
-                    
+
                     if (parent && !parent.deleted_time) {
                         logger.info(`Found existing Active Project Root via Anchor: ${anchor.parent_id}`);
                         return anchor.parent_id;
                     }
                 } catch (e) {
-                    // Parent might be missing entirely
                     continue;
                 }
             }
@@ -114,8 +118,7 @@ async function findProjectRootViaAnchor(): Promise<string | null> {
 export async function getOrInitProjectRootId(autoCreate: boolean = true): Promise<string | null> {
     const persistence = PersistenceService.getInstance();
     let rootId = await persistence.getValue('projects_root_id');
-    
-    // VALIDATION: Check if locally stored ID is still valid AND NOT IN TRASH
+
     let isValid = false;
     if (rootId) {
         try {
@@ -134,25 +137,21 @@ export async function getOrInitProjectRootId(autoCreate: boolean = true): Promis
         rootId = null;
     }
 
-    // SCENARIO 1: Local ID is valid and active.
     if (isValid) {
         await ensureAnchorNote(rootId);
         return rootId;
     }
 
-    // SCENARIO 2: No valid local ID. Search for Anchor Note.
     const discoveredId = await findProjectRootViaAnchor();
     if (discoveredId) {
         await persistence.setValue('projects_root_id', discoveredId);
         return discoveredId;
     }
 
-    // SCENARIO 3: Nothing found. 
     if (!autoCreate) {
         return null;
     }
 
-    // Fresh Start.
     logger.info("No Active Project Root found. Creating new structure.");
     const newRoot = await createNotebook("🗂️ Projects", "");
     const newId = newRoot.id;
@@ -193,15 +192,12 @@ async function saveProjectMeta(projectId: string, tasksFolderId: string) {
  * Falls back to the provided custom content (one-off), then the setting, then the default asset file.
  */
 async function getWikiTemplateContent(customContent?: string): Promise<string | null> {
-    // 1. Priority: One-off custom content from dialog
     if (customContent && customContent.trim().length > 0) {
         return customContent;
     }
 
-    // 2. Priority: Global Setting
     let templatePath = await getSettingValue(Config.SETTINGS.PROJECT_WIKI_TEMPLATE);
 
-    // 3. Priority: Default Asset
     if (!templatePath || templatePath.length === 0) {
         templatePath = path.join(await getPluginFolder(), "gui", "assets", "new_project_wiki_structure.json");
     }
@@ -261,30 +257,24 @@ export async function createProject(projectName: string, projectIcon: string, cu
         return false;
     }
 
-    // 1. Prepare Base Structure
     const projectStructure = JSON.parse(
         projectTemplateString
             .replace("<PRJ_ICON> ", projectIcon.length > 0 ? projectIcon + " " : projectIcon)
             .replace("<PRJ_NAME>", projectName)
     );
 
-    // 2. Fetch and Validate Wiki Template
     const wikiTemplateContent = await getWikiTemplateContent(customTemplateContent);
     if (!wikiTemplateContent) return false;
 
     const wikiTemplate = await parseAndValidateTemplate(wikiTemplateContent);
     if (!wikiTemplate) return false;
-    // Merging templates
+
     if (!projectStructure.children) projectStructure.children = [];
     projectStructure.children.push(wikiTemplate);
 
-    // Creating structure in Joplin
     const projectParentNotebookId = await getOrInitProjectRootId();
-    
-    // Creating root project folder
     const projectRootId = (await createNotebook(projectStructure.name, projectParentNotebookId)).id;
-    
-    // Creating children recursively
+
     let tasksFolderId: string | null = null;
     for (const element of projectStructure.children) {
         if ("content" in element) {
@@ -295,7 +285,6 @@ export async function createProject(projectName: string, projectIcon: string, cu
         }
     }
 
-    // Saving metadata
     if (tasksFolderId) {
         await saveProjectMeta(projectRootId, tasksFolderId);
     } else {
@@ -310,15 +299,12 @@ export async function createProject(projectName: string, projectIcon: string, cu
  * @returns Array of project objects {id, name}.
  */
 export async function getAllProjects() {
-    // Use the new robust resolver 
     const rootId = await getOrInitProjectRootId(false);
-    
+
     if (!rootId) return [];
 
-    // Fetch all folders using helper
     const folders = await fetchAllItems(['folders'], { fields: ['id', 'parent_id', 'title'] });
 
-    // Filter direct children of root and sort alphabetically (ignoring emojis)
     return folders
         .filter((f: any) => f.parent_id === rootId)
         .sort((a, b) => sanitizeTitle(a.title).localeCompare(sanitizeTitle(b.title), undefined, { sensitivity: 'accent' }))

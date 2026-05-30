@@ -30,9 +30,7 @@ export async function newProjectDialog() {
     }
 
     const result = await joplin.views.dialogs.open(dialog)
-    console.log(result);
     if (result.id === "projects_create_new_project_dialog_confirm") {
-        // Retrieving user submitted form data
         const formData = result.formData?.['projectForm']
         const projectName = formData?.['projectName']
         const projectIcon = formData?.['projectIcon']
@@ -73,17 +71,15 @@ export async function newTaskDialog(defaultProjectId?: string) {
         dialog = HANDLES[Config.DIALOGS.CREATE_TASK];
     }
 
-    // Set buttons - include Add Project (will be hidden via script)
+    // The Add Project button is hidden by the dialog script.
     await joplin.views.dialogs.setButtons(dialog, [
-        {id: "cancel", title: "Cancel"}, 
-        {id: "add_project", title: "AddProjectInternal"}, 
+        {id: "cancel", title: "Cancel"},
+        {id: "add_project", title: "AddProjectInternal"},
         {id: "create", title: "Create Task"}
     ]);
 
-    // Load HTML template
     let html = readFileContent(path.join(pluginFolder, "gui", "assets", "html", "new_task_dialog_content.html")) || "Error loading form";
-    
-    // Inject projects
+
     const projects = await getAllProjects();
     let optionsHtml = projects.map((p: any) => {
         const selected = (defaultProjectId && p.id === defaultProjectId) ? 'selected' : '';
@@ -100,11 +96,10 @@ export async function newTaskDialog(defaultProjectId?: string) {
     await joplin.views.dialogs.setHtml(dialog, html);
 
     const result = await joplin.views.dialogs.open(dialog);
-    console.log('newTaskDialog: result received:', result);
-    
+
     if (result.id === "add_project") {
         await newProjectDialog();
-        // Re-open task dialog after project creation, preserving selection if possible (or default)
+        // The task dialog is reopened after project creation, keeping the previous selection.
         return await newTaskDialog(defaultProjectId);
     }
 
@@ -141,41 +136,34 @@ export async function editTaskDialog(task: any) {
         {id: "save", title: "Save Changes"}
     ]);
 
-    // Load HTML template
     let html = readFileContent(path.join(pluginFolder, "gui", "assets", "html", "new_task_dialog_content.html")) || "Error loading form";
-    
-    // Customize for Edit
+
     html = html.replace('<h1>New Task</h1>', '<h1>Edit Task</h1>');
-    
-    // Disable Title and Project
+
     html = html.replace('id="taskTitle" name="taskTitle"', `id="taskTitle" name="taskTitle" value="${task.title}" disabled`);
-    
-    // For Project, we just show the one project as disabled
+
     const projectOptions = `<option value="${task.projectId}" selected>${task.projectName}</option>`;
     html = html.replace('id="taskProject" name="taskProject"', `id="taskProject" name="taskProject" disabled`);
     html = html.replace('<!-- Options will be injected via JS or dynamically generated HTML -->', projectOptions);
-    
-    // Remove the "+" button for project creation in edit mode
+
+    // The project-creation button is removed because the project is fixed in edit mode.
     html = html.replace('<button type="button" id="btnAddNewProject" class="btn-inline-add" title="Create new project">+</button>', '');
 
-    // Pre-fill Due Date
     if (task.dueDate && task.dueDate > 0) {
         const date = new Date(task.dueDate);
-        // Format to YYYY-MM-DDTHH:mm for datetime-local
+        // Formatted as YYYY-MM-DDTHH:mm in local time for the datetime-local input.
         const isoStr = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
         html = html.replace('id="taskDueDate" name="taskDueDate"', `id="taskDueDate" name="taskDueDate" value="${isoStr}"`);
     }
 
-    // Pre-fill Start Date
     if (task.startDate && task.startDate > 0) {
         const date = new Date(task.startDate);
-        // Format to YYYY-MM-DDTHH:mm for datetime-local
+        // Formatted as YYYY-MM-DDTHH:mm in local time for the datetime-local input.
         const isoStr = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
         html = html.replace('id="taskStartDate" name="taskStartDate"', `id="taskStartDate" name="taskStartDate" value="${isoStr}"`);
     }
 
-    // Pre-fill Urgency
-    const urgency = task.tags.find((t: string) => t.toLowerCase().includes('high')) ? 'high' : 
+    const urgency = task.tags.find((t: string) => t.toLowerCase().includes('high')) ? 'high' :
                     (task.tags.find((t: string) => t.toLowerCase().includes('low')) ? 'low' : 'normal');
     
     if (urgency === 'high') {
@@ -186,9 +174,9 @@ export async function editTaskDialog(task: any) {
         html = html.replace('value="normal" selected', 'value="normal"');
     }
 
-    // Subtasks are handled by the script which reads the hidden input value
+    // Subtasks are passed through a hidden input that the dialog script reads;
+    // double quotes are escaped to keep the value attribute well-formed.
     const subTasksStr = task.subTasks.map((st: any) => '  '.repeat(st.level || 0) + st.title).join('\n');
-    // Inject subtasks into hidden field, ensuring quotes are escaped
     html = html.replace('id="taskSubTasks" name="taskSubTasks" value=""', `id="taskSubTasks" name="taskSubTasks" value="${subTasksStr.replace(/"/g, '&quot;')}"`);
 
     await joplin.views.dialogs.setHtml(dialog, html);

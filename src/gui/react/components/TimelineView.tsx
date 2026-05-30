@@ -27,7 +27,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
     const [draggingTask, setDraggingTask] = React.useState<{ id: string, initialX: number, initialStart: number, initialDue: number, type: 'move' | 'resizeStart' | 'resizeEnd' } | null>(null);
     const [tempTaskDates, setTempTaskDates] = React.useState<Record<string, { start: number, end: number }>>({});
 
-    // We need to move the time calculations up so they can be used in the scroll listener and effects
+    // Time calculations live at component scope so the scroll listener and effects can reuse them.
     const now = Date.now();
     const timelineTasks = tasks
         .filter(t => t.dueDate && t.dueDate > 0 && t.status !== 'done');
@@ -82,7 +82,6 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
             if (draggingTask) {
                 const tempDates = tempTaskDates[draggingTask.id];
                 if (tempDates) {
-                    // Snap to end of day to be safe, or just leave as exact timestamp
                     const updatedTask = tasks.find(t => t.id === draggingTask.id);
                     if (updatedTask) {
                          window.webviewApi.postMessage({
@@ -112,17 +111,26 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
         };
     }, [draggingDep, draggingTask, containerWidth, viewDuration, tempTaskDates, tasks]);
 
+    /**
+     * Creates a dependency between two tasks based on the handles involved in the drag,
+     * deriving the dependency type (FS, SS, FF, SF) from the source and target handles.
+     * The dependency is stored on the target task. Cross-project links, cycles, and
+     * duplicates are rejected.
+     * @param sourceId The ID of the task the drag started from.
+     * @param sourceType The handle the drag started from ('start' or 'end').
+     * @param targetId The ID of the task the drag ended on.
+     * @param targetType The handle the drag ended on ('start' or 'end').
+     */
     const handleCreateDependency = (sourceId: string, sourceType: 'start'|'end', targetId: string, targetType: 'start'|'end') => {
         if (sourceId === targetId) return;
-        
+
         const targetTask = tasks.find(t => t.id === targetId);
         const sourceTask = tasks.find(t => t.id === sourceId);
         if (!targetTask || !sourceTask) return;
-        
-        if (targetTask.projectId !== sourceTask.projectId) return; // Must be same project
-        
-        // Determine the dependency type based on the handles used.
-        // Format: [Source Handle] to [Target Handle]
+
+        if (targetTask.projectId !== sourceTask.projectId) return;
+
+        // The dependency type is derived from which handle started the drag and which ended it.
         let type: 'FS'|'SS'|'FF'|'SF' = 'FS';
         if (sourceType === 'end' && targetType === 'start') type = 'FS';
         if (sourceType === 'start' && targetType === 'start') type = 'SS';
@@ -132,21 +140,23 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
         // For structural simplicity, the target task ALWAYS holds the dependency array pointing to the source task.
         const dependentId = targetId;
         const dependeeId = sourceId;
-        
-        // ---------------------------------------------------------
-        // Circular Dependency Check (BFS/DFS)
-        // We must ensure that adding 'dependeeId' as a requirement for 'dependentId'
-        // does not create a cycle. i.e., Does 'dependeeId' already depend on 'dependentId' 
-        // through some chain?
-        // ---------------------------------------------------------
+
+        /**
+         * Determines, via breadth-first traversal of the dependency graph, whether the
+         * start node already depends on the target node, which would indicate that adding
+         * the new dependency would form a cycle.
+         * @param startNodeId The node from which traversal begins.
+         * @param targetNodeId The node whose presence in the chain indicates a cycle.
+         * @returns True when a path from start to target exists.
+         */
         const hasCircularDependency = (startNodeId: string, targetNodeId: string): boolean => {
             const visited = new Set<string>();
             const queue = [startNodeId];
-            
+
             while (queue.length > 0) {
                 const currentId = queue.shift()!;
-                if (currentId === targetNodeId) return true; // Cycle detected
-                
+                if (currentId === targetNodeId) return true;
+
                 if (!visited.has(currentId)) {
                     visited.add(currentId);
                     const currentTask = tasks.find(t => t.id === currentId);
@@ -160,12 +170,10 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
             return false;
         };
 
-        // If the task we want to depend on (dependeeId) already depends on US (dependentId)
-        // or any of our children, it's a circular loop.
+        // The link is blocked when the dependee already depends on the dependent, since
+        // that would create a cycle.
         if (hasCircularDependency(dependeeId, dependentId)) {
-            // Can't use joplin dialog directly here easily, but we can prevent it.
             console.warn("Circular dependency detected. Action blocked.");
-            // In a full implementation, we'd trigger a toast notification here
             return;
         }
 
@@ -173,8 +181,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
         if (!dependentTask) return;
 
         const currentDeps = dependentTask.dependsOn || [];
-        
-        // Prevent duplicate dependencies between the same two tasks
+
         if (!currentDeps.some(d => d.id === dependeeId)) {
             window.webviewApi.postMessage({ 
                 name: 'updateTaskDependencies', 
@@ -183,20 +190,13 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
         }
     };
 
-    const updateVisibleRange = React.useCallback(() => {
-        if (!wrapperRef.current) return;
-        const wrapper = wrapperRef.current;
-        const scrollLeft = wrapper.scrollLeft;
-        const viewportWidth = wrapper.clientWidth;
-        const scrollWidth = wrapper.scrollWidth;
-
-        const startPercent = scrollLeft / scrollWidth;
-        const endPercent = (scrollLeft + viewportWidth) / scrollWidth;
-    }, []);
-
     const firstTaskTime = timelineTasks.length > 0 ? Math.min(...timelineTasks.map(t => t.startDate || t.createdTime)) : now;
     const lastTaskTime = timelineTasks.length > 0 ? Math.max(...timelineTasks.map(t => t.dueDate || 0)) : now;
 
+    /**
+     * Recomputes the visible time range and container width from the current horizontal
+     * scroll position of the timeline.
+     */
     const handleScroll = () => {
         if (!wrapperRef.current) return;
         const wrapper = wrapperRef.current;
@@ -216,18 +216,26 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
     };
 
     React.useEffect(() => {
-        // Initial calculation
         handleScroll();
         window.addEventListener('resize', handleScroll);
         return () => window.removeEventListener('resize', handleScroll);
-    }, [viewDuration, startRange, zoomLevel]); // Re-run when timeline dimensions change
+    }, [viewDuration, startRange, zoomLevel]);
 
+    /**
+     * Reports whether a given time falls within the currently visible range, applying a
+     * one-day buffer so jump controls disable slightly before the exact edge is reached.
+     * @param time The timestamp to test.
+     */
     const isTimeVisible = (time: number) => {
-        // Add a small buffer (e.g., 1 day) to consider it "visible" so the button disables slightly before it hits the exact edge
-        const buffer = 24 * 60 * 60 * 1000; 
+        const buffer = 24 * 60 * 60 * 1000;
         return time >= (visibleRange.start + buffer) && time <= (visibleRange.end - buffer);
     };
 
+    /**
+     * Changes the zoom level within its bounds while keeping the horizontal center point
+     * of the view stable across the re-render.
+     * @param direction The zoom direction, 'in' or 'out'.
+     */
     const handleZoom = (direction: 'in' | 'out') => {
         if (!wrapperRef.current) return;
         
@@ -244,8 +252,8 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
 
         setZoomLevel(newZoom);
 
-        // We need to wait for React to re-render with the new width, then adjust scroll.
-        // requestAnimationFrame ensures the DOM has updated.
+        // The scroll position is adjusted inside requestAnimationFrame so it runs after
+        // React has re-rendered the timeline at the new width.
         requestAnimationFrame(() => {
             if (!wrapperRef.current) return;
             const newScrollWidth = wrapperRef.current.scrollWidth;
@@ -265,24 +273,46 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
         );
     }
 
+    /**
+     * Requests deletion of a task from the backend.
+     * @param task The task to delete.
+     */
     const handleDeleteTask = (task: Task) => {
         window.webviewApi.postMessage({ name: 'deleteTask', payload: { task } });
     };
 
+    /**
+     * Opens the context menu for a task at the cursor position.
+     * @param e The triggering mouse event.
+     * @param task The task associated with the menu.
+     */
     const handleContextMenu = (e: React.MouseEvent, task: Task) => {
         e.preventDefault();
         setContextMenu({ x: e.clientX, y: e.clientY, task });
     };
 
+    /**
+     * Derives a stable, theme-aware HSL color for a project. The hue is hashed from the
+     * project ID to keep each project visually distinct, while saturation and lightness
+     * are read from theme-driven CSS variables so the color adapts to the active theme.
+     * @param projectId The project ID to map to a color.
+     * @returns An HSL color string referencing the theme-aware saturation and lightness.
+     */
     const getProjectColor = (projectId: string) => {
         let hash = 0;
         for (let i = 0; i < projectId.length; i++) {
             hash = projectId.charCodeAt(i) + ((hash << 5) - hash);
         }
         const h = Math.abs(hash) % 360;
-        return `hsl(${h}, 65%, 50%)`;
+        return `hsl(${h}, var(--prj-bar-saturation, 60%), var(--prj-bar-lightness, 50%))`;
     };
 
+    /**
+     * Converts an absolute timestamp into its horizontal position as a percentage of the
+     * visible timeline duration.
+     * @param time The timestamp to position.
+     * @returns The position as a percentage.
+     */
     const getPosition = (time: number) => ((time - startRange) / viewDuration) * 100;
     const nowPos = getPosition(now);
 
@@ -348,6 +378,11 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
         }
     }
 
+    /**
+     * Smoothly scrolls the timeline so that the first task, today, or the last task is
+     * centered in the viewport.
+     * @param target The point to scroll to.
+     */
     const handleJumpTo = (target: 'start' | 'today' | 'end') => {
         if (!wrapperRef.current) return;
         const wrapper = wrapperRef.current;
@@ -388,7 +423,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                     <button 
                         onClick={() => handleJumpTo('today')}
                         disabled={isTimeVisible(now)}
-                        style={{ padding: '4px 10px', cursor: isTimeVisible(now) ? 'not-allowed' : 'pointer', background: 'var(--joplin-background-color)', color: isTimeVisible(now) ? 'var(--joplin-color)' : '#ff4757', border: '1px solid var(--joplin-divider-color)', borderRadius: '4px', fontWeight: 'bold', opacity: isTimeVisible(now) ? 0.5 : 1 }}
+                        style={{ padding: '4px 10px', cursor: isTimeVisible(now) ? 'not-allowed' : 'pointer', background: 'var(--joplin-background-color)', color: isTimeVisible(now) ? 'var(--joplin-color)' : 'var(--prj-today)', border: '1px solid var(--joplin-divider-color)', borderRadius: '4px', fontWeight: 'bold', opacity: isTimeVisible(now) ? 0.5 : 1 }}
                     >
                         ⊙ Today
                     </button>
@@ -508,7 +543,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                                                 });
                                             }}
                                         />
-                                        <text x={midX} y={midY} fontSize="10" fill="#ff4757" textAnchor="middle" dominantBaseline="central" style={{ pointerEvents: 'none', fontWeight: 'bold' }}>✕</text>
+                                        <text x={midX} y={midY} fontSize="10" fill="var(--prj-danger)" textAnchor="middle" dominantBaseline="central" style={{ pointerEvents: 'none', fontWeight: 'bold' }}>✕</text>
                                     </g>
                                 );
                             });
@@ -547,9 +582,9 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                         }}></div>
                     ))}
 
-                    <div style={{ position: 'absolute', left: `${nowPos}%`, top: 0, bottom: 0, width: '2px', background: '#ff4757', zIndex: 10, pointerEvents: 'none' }}>
-                        <div style={{ position: 'absolute', top: '5px', right: '6px', color: '#ff4757', fontSize: '0.65rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>TODAY</div>
-                        <div style={{ position: 'absolute', bottom: '5px', right: '6px', color: '#ff4757', fontSize: '0.65rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>TODAY</div>
+                    <div style={{ position: 'absolute', left: `${nowPos}%`, top: 0, bottom: 0, width: '2px', background: 'var(--prj-today)', zIndex: 10, pointerEvents: 'none' }}>
+                        <div style={{ position: 'absolute', top: '5px', right: '6px', color: 'var(--prj-today)', fontSize: '0.65rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>TODAY</div>
+                        <div style={{ position: 'absolute', bottom: '5px', right: '6px', color: 'var(--prj-today)', fontSize: '0.65rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>TODAY</div>
                     </div>
 
                     {timelineTasks.map((task, index) => {
@@ -572,7 +607,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                                  title={`${task.projectName}\n${task.title}${task.startDate && task.startDate > 0 ? `\nStart: ${formatDate(task.startDate)}` : ''}${task.dueDate! > 0 ? `\n${isOverdue ? '(Overdue) ' : (isApproaching ? '(Approaching) ' : '')}Due: ${formatDate(task.dueDate!)}` : ''}`}>
                                 <div style={{ position: 'absolute', left: `${startPos}%`, top: '5px', fontSize: '0.9rem', color: 'var(--joplin-color)', whiteSpace: 'nowrap', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: projectColor, display: 'inline-block', flexShrink: 0 }}></span>
-                                    <span style={{ color: 'orange' }}>[{task.projectName}]</span> {task.title}
+                                    <span style={{ color: 'var(--prj-project-tag)' }}>[{task.projectName}]</span> {task.title}
                                 </div>
                                 <div className={`timeline-bar ${task.status === 'done' ? 'done' : ''}`} 
                                     onMouseDown={(e) => {
@@ -680,7 +715,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                                     top: '42px', 
                                     fontSize: '0.65rem', 
                                     opacity: 0.5,
-                                    whiteSpace: 'nowrap', // Ensure inline
+                                    whiteSpace: 'nowrap',
                                     display: width < 15 ? 'none' : 'block'
                                 }}>{formatDate(effectiveStart, false)}</div>
                                 <div style={{ 
@@ -690,10 +725,10 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onOpenNote, onEditTa
                                     fontSize: '0.65rem', 
                                     transform: width < 15 ? 'none' : 'translateX(-100%)', 
                                     opacity: (isOverdue || isApproaching) ? 1 : 0.5, 
-                                    color: isOverdue ? '#e74c3c' : (isApproaching ? '#e67e22' : 'inherit'),
+                                    color: isOverdue ? 'var(--prj-overdue)' : (isApproaching ? 'var(--prj-approaching)' : 'inherit'),
                                     fontWeight: (isOverdue || isApproaching) ? 'bold' : 'normal',
                                     textAlign: width < 15 ? 'left' : 'right',
-                                    whiteSpace: 'nowrap' // Ensure inline
+                                    whiteSpace: 'nowrap'
                                 }}>{formatDate(task.dueDate!, false)}</div>
                             </div>
                         );

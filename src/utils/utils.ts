@@ -157,6 +157,5 @@ export function isValidWikiStructure(data: any): data is WikiNode {
  */
 export function sanitizeTitle(title: string): string {
     if (!title) return '';
-    // Remove everything at the start that is NOT a letter or a number
     return title.replace(/^[^\p{L}\p{N}]+/u, '');
 }

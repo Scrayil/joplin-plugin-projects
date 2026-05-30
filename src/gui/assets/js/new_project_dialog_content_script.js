@@ -306,7 +306,7 @@ const EMOJI_MAP = {
     "🔸": "small orange diamond", "🔹": "small blue diamond", "🔺": "red triangle up", "🔻": "red triangle down",
     "💠": "diamond with dot", "🔘": "radio button", "🔳": "white square button", "🔲": "black square button",
 
-    // --- Flags (Finalmente!) ---
+    // --- Flags ---
     "🏁": "chequered flag", "🚩": "triangular flag", "🎌": "crossed flags", "🏴": "black flag",
     "🏳️": "white flag", "🏳️‍🌈": "rainbow flag lgbt", "🏴‍☠️": "pirate flag",
     "🇦🇨": "ascension island", "🇦🇩": "andorra", "🇦🇪": "united arab emirates uae", "🇦🇫": "afghanistan",
@@ -315,14 +315,14 @@ const EMOJI_MAP = {
     "🇦🇹": "austria", "🇦🇺": "australia", "🇦🇼": "aruba", "🇦🇽": "aland islands",
     "🇦🇿": "azerbaijan", "🇧🇦": "bosnia & herzegovina", "🇧🇧": "barbados", "🇧🇩": "bangladesh",
     "🇧🇪": "belgium", "🇧🇫": "burkina faso", "🇧🇬": "bulgaria", "🇧🇭": "bahrain",
-    "🇧🇮": "burundi", "🇧🇯": "benin", "🇧🇱": "st. barthélemy", "🇧🇲": "bermuda",
+    "🇧🇮": "burundi", "🇧🇯": "benin", "🇧🇱": "st. barthelemy", "🇧🇲": "bermuda",
     "🇧🇳": "brunei", "🇧🇴": "bolivia", "🇧🇶": "caribbean netherlands", "🇧🇷": "brazil",
     "🇧🇸": "bahamas", "🇧🇹": "bhutan", "🇧🇻": "bouvet island", "🇧🇼": "botswana",
     "🇧🇾": "belarus", "🇧🇿": "belize", "🇨🇦": "canada", "🇨🇨": "cocos (keeling) islands",
     "🇨🇩": "congo - kinshasa", "🇨🇫": "central african republic", "🇨🇬": "congo - brazzaville", "🇨🇭": "switzerland",
-    "🇨🇮": "côte d’ivoire ivory coast", "🇨🇰": "cook islands", "🇨🇱": "chile", "🇨🇲": "cameroon",
+    "🇨🇮": "cote d'ivoire ivory coast", "🇨🇰": "cook islands", "🇨🇱": "chile", "🇨🇲": "cameroon",
     "🇨🇳": "china", "🇨🇴": "colombia", "🇨🇵": "clipperton island", "🇨🇷": "costa rica",
-    "🇨🇺": "cuba", "🇨🇻": "cape verde", "🇨🇼": "curaçao", "🇨🇽": "christmas island",
+    "🇨🇺": "cuba", "🇨🇻": "cape verde", "🇨🇼": "curacao", "🇨🇽": "christmas island",
     "🇨🇾": "cyprus", "🇨🇿": "czechia czech republic", "🇩🇪": "germany", "🇩🇬": "diego garcia",
     "🇩🇯": "djibouti", "🇩🇰": "denmark", "🇩🇲": "dominica", "🇩🇴": "dominican republic",
     "🇩🇿": "algeria", "🇪🇦": "ceuta & melilla", "🇪🇨": "ecuador", "🇪🇪": "estonia",
@@ -357,12 +357,12 @@ const EMOJI_MAP = {
     "🇵🇫": "french polynesia", "🇵🇬": "papua new guinea", "🇵🇭": "philippines", "🇵🇰": "pakistan",
     "🇵🇱": "poland", "🇵🇲": "st. pierre & miquelon", "🇵🇳": "pitcairn islands", "🇵🇷": "puerto rico",
     "🇵🇸": "palestinian territories", "🇵🇹": "portugal", "🇵🇼": "palau", "🇵🇾": "paraguay",
-    "🇶🇦": "qatar", "🇷🇪": "réunion", "🇷🇴": "romania", "🇷🇸": "serbia",
+    "🇶🇦": "qatar", "🇷🇪": "reunion", "🇷🇴": "romania", "🇷🇸": "serbia",
     "🇷🇺": "russia", "🇷🇼": "rwanda", "🇸🇦": "saudi arabia", "🇸🇧": "solomon islands",
     "🇸🇨": "seychelles", "🇸🇩": "sudan", "🇸🇪": "sweden", "🇸🇬": "singapore",
     "🇸🇭": "st. helena", "🇸🇮": "slovenia", "🇸🇯": "svalbard & jan mayen", "🇸🇰": "slovakia",
     "🇸🇱": "sierra leone", "🇸🇲": "san marino", "🇸🇳": "senegal", "🇸🇴": "somalia",
-    "🇸🇷": "suriname", "🇸🇸": "south sudan", "🇸🇹": "são tomé & príncipe", "🇸🇻": "el salvador",
+    "🇸🇷": "suriname", "🇸🇸": "south sudan", "🇸🇹": "sao tome & principe", "🇸🇻": "el salvador",
     "🇸🇽": "sint maarten", "🇸🇾": "syria", "🇸🇿": "eswatini", "🇹🇦": "tristan da cunha",
     "🇹🇨": "turks & caicos islands", "🇹🇩": "chad", "🇹🇫": "french southern territories", "🇹🇬": "togo",
     "🇹🇭": "thailand", "🇹🇯": "tajikistan", "🇹🇰": "tokelau", "🇹🇱": "timor-leste",
@@ -395,7 +395,7 @@ window.scrollToCategory = function(index) {
 const initPlugin = () => {
     const dialogRoot = document.querySelector('.dialog-root');
     const triggerBtn = document.getElementById('btn-emoji-trigger');
-    const fileBtn = document.getElementById('btn-file-trigger'); // This seems unused, leaving for now.
+    const fileBtn = document.getElementById('btn-file-trigger');
     const wrapper = document.getElementById('emoji-picker-wrapper');
     const displaySpan = document.getElementById('current-icon-display');
     const searchInput = document.getElementById('emoji-search-input');
@@ -446,7 +446,7 @@ const initPlugin = () => {
             const emoji = (btn.getAttribute('data-emoji') || '').toLowerCase();
 
             if (keywords.includes(lowerTerm) || emoji.includes(lowerTerm)) {
-                btn.style.display = 'flex'; // Or 'inline-block' depending on your CSS
+                btn.style.display = 'flex';
             } else {
                 btn.style.display = 'none';
             }
@@ -518,7 +518,6 @@ const initPlugin = () => {
     if (fileBtn) {
         fileBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            console.log("File open request...");
         });
     }
 

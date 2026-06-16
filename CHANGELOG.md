@@ -1,5 +1,20 @@
 # Changelog
 
+[v1.4.0] - 16/06/26
+### ✨ Features & Enhancements
+- Reworked the Timeline into a professional, interactive Gantt chart.
+- Added task **Start Date** support, with start-to-due bars and sorting by start date.
+- Added **task dependencies** (Finish-to-Start, Start-to-Start, Finish-to-Finish, Start-to-Finish), created by dragging between task handles and drawn with clean orthogonal arrows.
+- Added **Critical Path** highlighting (toggle) to show the longest dependency chain per project.
+- Drag to move and resize task bars with day snapping, a live date tooltip, and an in-bar progress indicator (share of completed subtasks).
+- Added **milestones**, shown as diamonds for zero-duration tasks.
+- Dependent tasks are automatically rescheduled when a linked task is moved.
+- Colors now adapt dynamically to the active Joplin theme across every view (Kanban, Timeline, List, Wiki).
+
+### 🐛 Bug Fixes
+- Invalid dependencies (self, cross-project, circular, or schedule-conflicting links) are now prevented with clear messages.
+- Removed connector-line and snap-back glitches when editing the timeline, and made interactions feel instant across all views.
+
 [v1.3.0] - 11/02/26
 ### ✨ Features & Enhancements
 - Added an 'Urgent Only' toggle to filter Overdue and Approaching tasks.

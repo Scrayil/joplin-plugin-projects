@@ -90,7 +90,10 @@ export class TaskDashboard {
                 if (message.name === 'toggleSubTask') {
                     return await this.toggleSubTask(message.payload);
                 }
-                
+                if (message.name === 'toggleWikiCheckbox') {
+                    return await this.toggleWikiCheckbox(message.payload);
+                }
+
                 if (['openNote', 'toggleSideBar', 'toggleNoteList', 'synchronize', 'toggleMenuBar', 'resetLayout'].includes(message.name)) {
                      const commandArgs = message.payload?.taskId ? [message.payload.taskId] : [];
                      await joplin.commands.execute(message.name, ...commandArgs);
@@ -150,11 +153,20 @@ export class TaskDashboard {
     }
 
     /**
+     * Signals the webview to reset its view state, so reopening the dashboard from a fully
+     * hidden state starts on a clean view rather than restoring the previous scroll and tab.
+     */
+    private async notifyDashboardReset() {
+        await joplin.views.panels.postMessage(this.panelHandle, { name: 'dashboardReset' });
+    }
+
+    /**
      * Makes the dashboard panel visible if it is currently hidden.
      */
     public async show() {
         if (await joplin.views.panels.visible(this.panelHandle)) return;
         await joplin.views.panels.show(this.panelHandle);
+        await this.notifyDashboardReset();
     }
 
     /**
@@ -163,6 +175,9 @@ export class TaskDashboard {
     public async toggle() {
         const isVisible = await joplin.views.panels.visible(this.panelHandle);
         await joplin.views.panels.show(this.panelHandle, !isVisible);
+        if (!isVisible) {
+            await this.notifyDashboardReset();
+        }
     }
 
     /**
@@ -175,6 +190,11 @@ export class TaskDashboard {
             if (result) {
                 if (result.action === 'save') {
                     const formData = result.data;
+                    const title = (formData.taskTitle || '').trim();
+                    if (!title) {
+                        await joplin.views.dialogs.showToast({ message: "Task title required", duration: 3000, type: ToastType.Error });
+                        return;
+                    }
                     const urgency = formData.taskUrgency;
                     const dueDateStr = formData.taskDueDate;
                     let dueDate = dueDateStr ? new Date(dueDateStr).getTime() : 0;
@@ -195,7 +215,7 @@ export class TaskDashboard {
                         .map((s: string) => s.replace(/\s+$/, ''))
                         .filter((s: string) => s.trim().length > 0);
 
-                    await this.updateTask(task.id, { subTasks, urgency, dueDate, startDate });
+                    await this.updateTask(task.id, { title, subTasks, urgency, dueDate, startDate });
                 } else if (result.action === 'delete') {
                     await this.handleDeleteTaskWithConfirmation(task);
                 } else if (result.action === 'text_edit') {
@@ -240,10 +260,10 @@ export class TaskDashboard {
 
         const formData = await newTaskDialog(defaultProjectId);
         if (formData) {
-            const title = formData.taskTitle;
+            const title = (formData.taskTitle || '').trim();
             const projectId = formData.taskProject;
-            
-            if (!title || title.trim().length === 0) {
+
+            if (!title) {
                 await joplin.views.dialogs.showToast({ message: "Task title required", duration: 3000, type: ToastType.Error });
                 return;
             }
@@ -306,11 +326,7 @@ export class TaskDashboard {
                 await updateNote(note.id, updates);
             }
 
-            if (payload.urgency && payload.urgency !== Config.TAGS.KEYWORDS.NORMAL) {
-                await this.tagService.updatePriorityTags(note.id, payload.urgency);
-            } else {
-                 await this.tagService.updatePriorityTags(note.id, 'medium');
-            }
+            await this.tagService.updatePriorityTags(note.id, payload.urgency || Config.TAGS.KEYWORDS.MEDIUM);
             
             await joplin.views.dialogs.showToast({ message: "Task created successfully!", duration: 3000, type: ToastType.Success });
             return { success: true };
@@ -323,9 +339,9 @@ export class TaskDashboard {
     }
 
     /**
-     * Updates an existing task's body (subtasks), due date, and urgency tags.
+     * Updates an existing task's title, body (subtasks), due date, and urgency tags.
      */
-    private async updateTask(taskId: string, payload: { subTasks: string[]; urgency: string; dueDate: number; startDate?: number }) {
+    private async updateTask(taskId: string, payload: { title?: string; subTasks: string[]; urgency: string; dueDate: number; startDate?: number }) {
         try {
             // Retrieve existing body to merge updates without data loss
             const currentNote = await getNote(taskId, ['body', 'application_data']);
@@ -350,11 +366,15 @@ export class TaskDashboard {
                 delete appData['joplin-plugin-projects'].startDate;
             }
 
-            await updateNote(taskId, { 
+            const updates: any = {
                 body: body,
                 todo_due: payload.dueDate,
                 application_data: JSON.stringify(appData)
-            });
+            };
+            if (payload.title && payload.title.trim().length > 0) {
+                updates.title = payload.title.trim();
+            }
+            await updateNote(taskId, updates);
 
             await this.tagService.updatePriorityTags(taskId, payload.urgency);
 
@@ -442,9 +462,10 @@ export class TaskDashboard {
             visited.add(targetTask.id);
 
             await this.updateTask(targetTask.id, {
-                // updateTask expects string[]; only the titles are needed to rebuild the markdown.
-                subTasks: targetTask.subTasks.map((st: any) => st.title),
-                urgency: targetTask.tags.find((t: string) => ['high','medium','normal','low'].includes(t.toLowerCase())) || 'normal',
+                // The full subtask objects are forwarded so their completion state and nesting
+                // level are preserved when the markdown body is rebuilt.
+                subTasks: targetTask.subTasks,
+                urgency: targetTask.tags.find((t: string) => ['high','medium','low'].includes(t.toLowerCase())) || Config.TAGS.KEYWORDS.MEDIUM,
                 dueDate: newTargetDue,
                 startDate: newTargetStart
             });
@@ -531,6 +552,23 @@ export class TaskDashboard {
         
         if (newBody !== note.body) {
             await updateNote(payload.taskId, { body: newBody });
+        }
+
+        return { success: true };
+    }
+
+    /**
+     * Toggles a single plain checkbox by index within any note body, used by the Wiki
+     * reader for note checklists that are not task subtasks, then refreshes the dashboard.
+     */
+    private async toggleWikiCheckbox(payload: { noteId: string, index: number, checked: boolean }) {
+        const note = await getNote(payload.noteId, ['body']);
+        const newBody = this.noteParser.toggleCheckboxAt(note.body, payload.index, payload.checked);
+
+        if (newBody !== note.body) {
+            await updateNote(payload.noteId, { body: newBody });
+            this.projectService.invalidateCache();
+            await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
         }
 
         return { success: true };

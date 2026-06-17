@@ -4,6 +4,8 @@
 export interface SubTask {
     title: string;
     completed: boolean;
+    level: number;
+    originalIndex: number;
 }
 
 /**

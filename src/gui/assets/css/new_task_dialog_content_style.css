@@ -224,6 +224,21 @@ select:disabled {
     border: 1px solid var(--joplin-divider-color);
 }
 
+/* Completed subtasks are dimmed and struck through so their status is obvious while
+   reordering the list, with a leading check mark left intact for quick scanning. */
+.subtask-item.completed .subtask-title {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+.subtask-done-mark {
+    flex-shrink: 0;
+    margin-right: 6px;
+    font-weight: bold;
+    color: var(--joplin-color-correct, #6aab73);
+    opacity: 0.8;
+}
+
 .subtask-item.empty {
     display: flex;
     color: transparent;

@@ -133,7 +133,8 @@
     function serialize() {
         const lines = subTasks.map(t => {
             const indent = '  '.repeat(t.level || 0);
-            return `${indent}- [ ] ${t.title}`;
+            const mark = t.completed ? 'x' : ' ';
+            return `${indent}- [${mark}] ${t.title}`;
         });
         hiddenInput.value = lines.join('\n');
     }
@@ -142,7 +143,7 @@
         const lines = hiddenInput.value.split('\n');
         lines.forEach(line => {
             if (!line.trim()) return;
-            const match = line.match(/^(\s*)(?:-\s*\[[ xX]\]\s*)?(.*)$/);
+            const match = line.match(/^(\s*)(?:-\s*\[([ xX])\]\s*)?(.*)$/);
             if (match) {
                 const rawIndent = match[1];
                 let level = 0;
@@ -150,11 +151,13 @@
                 if (rawIndent.includes('\t')) level = rawIndent.length;
                 else level = Math.floor(rawIndent.length / 2);
 
-                let title = match[2].trim();
+                const completed = (match[2] || '').toLowerCase() === 'x';
+
+                let title = match[3].trim();
                 // Legacy cleanup
                 if (title.startsWith('- [')) title = title.replace(/^-\s*\[[ xX]\]\s*/, '');
 
-                subTasks.push({ id: uuid(), title: title, level: level });
+                subTasks.push({ id: uuid(), title: title, level: level, completed: completed });
             }
         });
     }
@@ -439,7 +442,16 @@
             dragHandle.textContent = '⋮⋮';
             dropTarget.appendChild(dragHandle);
 
+            if (node.completed) {
+                dropTarget.classList.add('completed');
+                const doneMark = document.createElement('span');
+                doneMark.className = 'subtask-done-mark';
+                doneMark.textContent = '✓';
+                dropTarget.appendChild(doneMark);
+            }
+
             const span = document.createElement('span');
+            span.className = 'subtask-title';
             span.textContent = node.title;
             span.title = node.title;
             span.style.flex = '1';

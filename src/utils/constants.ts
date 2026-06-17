@@ -38,7 +38,6 @@ export const Config = {
             HIGH: 'high',
             MEDIUM: 'medium',
             LOW: 'low',
-            NORMAL: 'normal',
             IN_PROGRESS: 'in progress',
             DOING: 'doing'
         }

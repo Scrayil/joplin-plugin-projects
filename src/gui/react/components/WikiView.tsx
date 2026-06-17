@@ -30,11 +30,54 @@ const getConfiguredMdParser = (): MarkdownIt => {
 
 const mdParser = getConfiguredMdParser();
 
+/**
+ * Maps a rendered wiki link to its icon (a Font Awesome class with an emoji fallback)
+ * based on the target: internal note links (distinguishing notes present in the current
+ * wiki from external ones) and local resource links by MIME type. Returns null for links
+ * that should carry no icon; inline images are rendered as <img>, never as links.
+ * @param anchor The rendered anchor element.
+ */
+const wikiLinkIcon = (anchor: HTMLAnchorElement): { fa: string, emoji: string } | null => {
+    const raw = anchor.getAttribute('href') || '';
+    const noteLink = raw.match(/^:\/([0-9a-f]{32})$/i);
+    if (noteLink) {
+        return document.getElementById(`wiki-section-${noteLink[1]}`)
+            ? { fa: 'fas fa-file-alt', emoji: '📄' }
+            : { fa: 'fas fa-external-link-alt', emoji: '🔗' };
+    }
+    if (raw.startsWith('file://')) {
+        let mime = '';
+        try { mime = new URLSearchParams(new URL(raw).hash.substring(1)).get('mime') || ''; } catch (e) { /* malformed URI */ }
+        if (mime.startsWith('video/')) return { fa: 'fas fa-film', emoji: '🎬' };
+        if (mime.startsWith('audio/')) return { fa: 'fas fa-music', emoji: '🎵' };
+        if (mime === 'application/pdf') return { fa: 'fas fa-file-pdf', emoji: '📕' };
+        return { fa: 'fas fa-paperclip', emoji: '📎' };
+    }
+    return null;
+};
+
+/**
+ * Detects whether a Font Awesome icon font is loaded in the panel, so link icons can fall
+ * back to emoji when it is not available.
+ */
+const isFontAwesomeAvailable = (): boolean => {
+    try {
+        const fonts: any = (document as any).fonts;
+        if (!fonts || typeof fonts.check !== 'function') return false;
+        return fonts.check('16px "Font Awesome 6 Free"')
+            || fonts.check('900 16px "Font Awesome 6 Free"')
+            || fonts.check('16px "Font Awesome 5 Free"')
+            || fonts.check('16px FontAwesome');
+    } catch (e) {
+        return false;
+    }
+};
+
 interface WikiViewProps {
     projectId: string;
     onOpenNote: (noteId: string) => void;
-    onToggleSubTask?: (taskId: string, subTaskIndex: number, checked: boolean) => void;
     lastUpdated: number;
+    isActive: boolean;
 }
 
 /**
@@ -180,7 +223,7 @@ const TocLevel: React.FC<{
  * contents, sanitized and syntax-highlighted Markdown rendering, task-list toggling,
  * and an inline media player for local video and audio resources.
  */
-const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubTask, lastUpdated }) => {
+const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated, isActive }) => {
     const [wikiData, setWikiData] = useState<WikiNode[]>([]);
     const [loading, setLoading] = useState(true);
     const [isTocOpen, setIsTocOpen] = useState(() => {
@@ -194,6 +237,10 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
     const wikiTree = useMemo(() => buildTree(wikiData), [wikiData]);
     
     useEffect(() => {
+        // The wiki query is the heaviest backend call, so it is fetched only while the view
+        // is the active tab; kept mounted but inactive, it retains its last render and scroll
+        // without polling in the background, and refreshes when reactivated.
+        if (!isActive) return;
         let mounted = true;
         /**
          * Fetches the wiki structure for the current project, ignoring the response if
@@ -210,7 +257,7 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
         };
         fetchWiki();
         return () => { mounted = false; };
-    }, [projectId, lastUpdated]);
+    }, [projectId, lastUpdated, isActive]);
 
     /**
      * Reorders a note or folder within its sibling group after a drag-and-drop, updates
@@ -314,6 +361,7 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
 
     useEffect(() => {
         if (!loading && wikiData) {
+            const faAvailable = isFontAwesomeAvailable();
             contentRef.current?.querySelectorAll('.markdown-content').forEach(el => {
                 const markdown = el.getAttribute('data-markdown');
                 if (markdown) {
@@ -322,6 +370,19 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
                         ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp|file):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
                     });
                     el.innerHTML = cleanHtml;
+
+                    // Prefix note and resource links with a type icon (images render as <img>,
+                    // so they are unaffected).
+                    el.querySelectorAll('a').forEach((a) => {
+                        const icon = wikiLinkIcon(a as HTMLAnchorElement);
+                        if (!icon) return;
+                        const marker = document.createElement(faAvailable ? 'i' : 'span');
+                        if (faAvailable) marker.className = icon.fa;
+                        else marker.textContent = icon.emoji;
+                        marker.style.marginRight = '5px';
+                        marker.style.opacity = '0.75';
+                        a.prepend(marker);
+                    });
                 }
             });
             contentRef.current?.querySelectorAll('pre code').forEach((block) => hljs.highlightElement(block as HTMLElement));
@@ -329,14 +390,31 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
     }, [loading, wikiData]);
 
     /**
-     * Handles clicks within the rendered wiki content, opening local video and audio
-     * resources in the inline media player and forwarding task-list checkbox toggles.
+     * Handles clicks within the rendered wiki content: navigating internal note links,
+     * opening local video and audio resources in the inline media player, and persisting
+     * note checkbox toggles back to the source note.
      * @param e The click event.
      */
     const handleContentClick = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
-        if (target.tagName === 'A') {
-            const href = (target as HTMLAnchorElement).href;
+        const anchor = target.closest('a');
+        if (anchor) {
+            // Joplin internal note links (`:/<32-hex>`): scroll to the target note when it is
+            // part of the current wiki, otherwise open it in the editor.
+            const rawHref = anchor.getAttribute('href') || '';
+            const noteLink = rawHref.match(/^:\/([0-9a-f]{32})$/i);
+            if (noteLink) {
+                e.preventDefault();
+                const noteId = noteLink[1];
+                if (document.getElementById(`wiki-section-${noteId}`)) {
+                    scrollToSection(noteId);
+                } else {
+                    onOpenNote(noteId);
+                }
+                return;
+            }
+
+            const href = anchor.href;
             if (href.startsWith('file://')) {
                 let type: 'video' | 'audio' | null = null;
                 let mime = '';
@@ -349,7 +427,7 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
                 else if (mime.startsWith('audio/')) type = 'audio';
                 if (type) {
                     e.preventDefault();
-                    setActiveMedia({ url: href.split('#')[0], type: type, name: target.innerText || 'Media' });
+                    setActiveMedia({ url: href.split('#')[0], type: type, name: anchor.innerText || 'Media' });
                 }
             }
         }
@@ -358,16 +436,17 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
             const checkbox = target as HTMLInputElement;
             const noteContainer = target.closest('[id^="wiki-section-"]');
             const markdownContent = target.closest('.markdown-content');
-            
+
             if (noteContainer && markdownContent) {
                 const noteId = noteContainer.id.replace('wiki-section-', '');
                 const checkboxes = Array.from(markdownContent.querySelectorAll('input[type="checkbox"]'));
-                const subTaskIndex = checkboxes.indexOf(checkbox);
-                
-                if (subTaskIndex !== -1 && onToggleSubTask) {
-                    // The toggle is forwarded to the backend, which persists the change
-                    // and pushes the updated state back through Joplin's note watcher.
-                    onToggleSubTask(noteId, subTaskIndex, checkbox.checked);
+                const checkboxIndex = checkboxes.indexOf(checkbox);
+
+                if (checkboxIndex !== -1) {
+                    // Wiki note checkboxes are plain markdown checkboxes, not task subtasks, so
+                    // the toggle is sent straight to the backend to flip that checkbox by index
+                    // in the source note; the note watcher then refreshes the wiki.
+                    window.webviewApi.postMessage({ name: 'toggleWikiCheckbox', payload: { noteId, index: checkboxIndex, checked: checkbox.checked } });
                 }
             }
         }
@@ -386,6 +465,30 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
                 .markdown-body a {
                     color: var(--joplin-color) !important;
                     text-decoration: underline;
+                }
+
+                /* Responsive reader: content flows to the available width with a readable
+                   maximum measure, while intrinsically wide elements scroll or scale inside
+                   their own box instead of forcing the whole pane to scroll horizontally. */
+                .wiki-reader-content .markdown-content {
+                    overflow-wrap: break-word;
+                    word-break: break-word;
+                }
+                .wiki-reader-content .markdown-body img {
+                    max-width: 100%;
+                    height: auto;
+                }
+                .wiki-reader-content .markdown-body pre {
+                    max-width: 100%;
+                    overflow-x: auto;
+                }
+                .wiki-reader-content .markdown-body table {
+                    display: block;
+                    max-width: 100%;
+                    overflow-x: auto;
+                }
+                .wiki-reader-content .markdown-body a {
+                    overflow-wrap: anywhere;
                 }
 
                 /* Adaptive Drop Hint Variables */
@@ -425,19 +528,19 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, onToggleSubT
 
                 <div className="sidebar-toggle" onClick={() => setIsTocOpen(!isTocOpen)} title={isTocOpen ? "Collapse Sidebar" : "Expand Sidebar"}><i className={`fas fa-chevron-${isTocOpen ? 'left' : 'right'}`} style={{ fontSize: '0.9rem' }}></i></div>
 
-                <div ref={contentRef} onClick={handleContentClick} className="wiki-reader-content" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', scrollBehavior: 'smooth', boxSizing: 'border-box' }}>
-                    <div style={{ padding: '25px', width: 'fit-content', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <div ref={contentRef} onClick={handleContentClick} className="wiki-reader-content" style={{ flex: 1, minWidth: 0, overflowY: 'auto', overflowX: 'hidden', scrollBehavior: 'smooth', boxSizing: 'border-box' }}>
+                    <div style={{ padding: '25px', width: '100%', maxWidth: '1000px', margin: '0 auto', boxSizing: 'border-box' }}>
                         {wikiData.map(node => (
                             <div id={`wiki-section-${node.id}`} key={node.id} style={{ marginBottom: '40px', width: '100%' }}>
                                 {node.type === 'folder' ? (
-                                    <h2 className="wiki-folder-header" style={{ fontSize: `${Math.max(1.1, 1.5 - (node.level * 0.1))}rem`, margin: '0 0 20px 0', whiteSpace: 'nowrap' }}>{node.title}</h2>
+                                    <h2 className="wiki-folder-header" style={{ fontSize: `${Math.max(1.1, 1.5 - (node.level * 0.1))}rem`, margin: '0 0 20px 0', overflowWrap: 'break-word' }}>{node.title}</h2>
                                 ) : (
                                     <div className="wiki-page">
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                                            <h3 className="wiki-page-header" style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ fontSize: '1rem' }}>📄</span> {node.title}</h3>
-                                            <button onClick={() => onOpenNote(node.id)} style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--joplin-color)', opacity: 0.7, marginLeft: '20px' }} title="Open in Editor">Edit ✏️</button>
+                                            <h3 className="wiki-page-header" style={{ margin: 0, minWidth: 0, overflowWrap: 'break-word' }}><span style={{ fontSize: '1rem' }}>📄</span> {node.title}</h3>
+                                            <button onClick={() => onOpenNote(node.id)} style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--joplin-color)', opacity: 0.7, marginLeft: '20px', flexShrink: 0 }} title="Open in Editor">Edit ✏️</button>
                                         </div>
-                                        <div className="markdown-body" style={{ background: 'var(--joplin-background-color)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '25px', lineHeight: '1.6', fontSize: '0.95rem' }}>
+                                        <div className="markdown-body" style={{ background: 'var(--joplin-background-color)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '25px', lineHeight: '1.6', fontSize: '0.95rem', width: '100%', boxSizing: 'border-box' }}>
                                             <div className="markdown-content" data-markdown={node.body || "_No content._"}></div>
                                         </div>
                                     </div>

@@ -5,7 +5,7 @@ import { NoteParser } from './NoteParser';
 import * as path from 'path';
 import * as fs from 'fs';
 import { getOrInitProjectRootId } from '../utils/projects';
-import { fetchAllItems, getNote, createNotebook, getFolder, getResourcePath, getResource } from '../utils/database';
+import { fetchAllItems, getNote, createNotebook, getFolder, getResourcePath } from '../utils/database';
 import { PersistenceService } from './PersistenceService';
 import { SyncService } from './SyncService';
 
@@ -489,11 +489,26 @@ export class ProjectService {
                         const uniqueIds = Array.from(new Set(matches.map(m => m.id)));
                         const resourceMap = new Map<string, { path: string, mime: string }>();
 
+                        // A `:/` link may point to a resource or to another note. The note's
+                        // attached resources are listed first so that note links are never sent
+                        // to the resource API, which would otherwise log a "No such resource"
+                        // error for every internal note link in the wiki.
+                        const noteResources = await fetchAllItems(['notes', item.id, 'resources'], { fields: ['id', 'mime'] });
+                        const mimeByResourceId = new Map<string, string>(
+                            noteResources.map((res: any) => [res.id, res.mime || ''])
+                        );
+
                         await Promise.all(uniqueIds.map(async (id) => {
-                            const path = await getResourcePath(id);
-                            const meta = await getResource(id, ['mime']);
-                            if (path) {
-                                resourceMap.set(id, { path, mime: meta?.mime || '' });
+                            // IDs absent from the note's resource set are internal note links and
+                            // are left untouched for the frontend to resolve client-side.
+                            if (!mimeByResourceId.has(id)) return;
+                            try {
+                                const path = await getResourcePath(id);
+                                if (path) {
+                                    resourceMap.set(id, { path, mime: mimeByResourceId.get(id) || '' });
+                                }
+                            } catch (e) {
+                                // Resource path resolution failed; the link is kept as-is.
                             }
                         }));
 

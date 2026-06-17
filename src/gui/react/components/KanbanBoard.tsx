@@ -243,9 +243,15 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
                     <React.Fragment>
                         <div
                             className="subtasks-expanded-backdrop"
-                            onClick={() => setExpandedTask(null)}
+                            onClick={(e) => { e.stopPropagation(); setExpandedTask(null); }}
+                            onDoubleClick={(e) => e.stopPropagation()}
                         />
-                        <div className="task-subtasks-wrapper subtasks-expanded-overlay">
+                        <div
+                            className="task-subtasks-wrapper subtasks-expanded-overlay"
+                            onClick={(e) => e.stopPropagation()}
+                            onDoubleClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                        >
                             <div className="subtasks-expanded-header">
                                 <h3>Subtasks for: {task.title}</h3>
                                 <button className="subtasks-close-btn" onClick={() => setExpandedTask(null)}>

@@ -16,7 +16,7 @@
 ### 🐛 Bug Fixes
 - Subtask completion is preserved through GUI edits and dependency-driven rescheduling, which previously reset checkboxes and flattened nesting.
 - Re-nesting in the dialog normalizes the hierarchy, so a completed parent above an incomplete child is cleared.
-- The Kanban "Expand Subtasks" overlay no longer passes clicks through to cards behind it or hijacks card drag.
+- The Kanban "Expand Subtasks" overlay no longer passes clicks through to cards behind it, hijacks card drag, or opens the task editor on double-click.
 - Rendering wiki note links no longer floods the console with "No such resource" errors.
 - Sorting is deterministic, so toggling a subtask no longer reshuffles cards.
 

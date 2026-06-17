@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { Task, Project } from '../types';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import {formatDate} from "../utils";
@@ -225,25 +226,39 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, onUpdateStatus, onTogg
 
         return (
             <React.Fragment>
-                {isExpanded && (
-                    <div 
-                        className="subtasks-expanded-backdrop" 
-                        onClick={(e) => { e.stopPropagation(); setExpandedTask(null); }}
-                    />
-                )}
-                <div className={`task-subtasks-wrapper ${isExpanded ? 'subtasks-expanded-overlay' : ''}`} style={!isExpanded ? { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' } : {}}>
-                    {isExpanded && (
-                        <div className="subtasks-expanded-header">
-                            <h3>Subtasks for: {task.title}</h3>
-                            <button className="subtasks-close-btn" onClick={(e) => { e.stopPropagation(); setExpandedTask(null); }}>
-                                &times;
-                            </button>
-                        </div>
-                    )}
-                    <div className={`task-subtasks-container ${isExpanded ? 'expanded' : ''}`} style={{ marginTop: (!isExpanded) ? '8px' : '0', overflowY: 'auto', flex: 1, minHeight: 0, maxHeight: '100%' }}>
+                {/* Inline subtask list shown inside the card. */}
+                <div className="task-subtasks-wrapper" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                    <div className="task-subtasks-container" style={{ marginTop: '8px', overflowY: 'auto', flex: 1, minHeight: 0, maxHeight: '100%' }}>
                         {tree.map(node => renderNode(node))}
                     </div>
                 </div>
+
+                {/*
+                  * The fullscreen overlay is rendered through a portal to document.body so it
+                  * escapes the Kanban drag-and-drop context and any transformed ancestor:
+                  * this stops clicks from reaching the cards behind it and prevents an
+                  * interaction inside the overlay from starting a card drag.
+                  */}
+                {isExpanded && createPortal(
+                    <React.Fragment>
+                        <div
+                            className="subtasks-expanded-backdrop"
+                            onClick={() => setExpandedTask(null)}
+                        />
+                        <div className="task-subtasks-wrapper subtasks-expanded-overlay">
+                            <div className="subtasks-expanded-header">
+                                <h3>Subtasks for: {task.title}</h3>
+                                <button className="subtasks-close-btn" onClick={() => setExpandedTask(null)}>
+                                    &times;
+                                </button>
+                            </div>
+                            <div className="task-subtasks-container expanded" style={{ marginTop: '0', overflowY: 'auto', flex: 1, minHeight: 0, maxHeight: '100%' }}>
+                                {tree.map(node => renderNode(node))}
+                            </div>
+                        </div>
+                    </React.Fragment>,
+                    document.body
+                )}
             </React.Fragment>
         );
     };

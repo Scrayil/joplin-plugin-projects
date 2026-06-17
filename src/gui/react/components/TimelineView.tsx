@@ -22,6 +22,13 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
     const [containerWidth, setContainerWidth] = React.useState<number>(800);
     const wrapperRef = React.useRef<HTMLDivElement>(null);
     const bodyRef = React.useRef<HTMLDivElement>(null);
+    // Tracks whether the initial centering on today has run for this mount, so the timeline
+    // opens centered on the current day the first time it gains a real width (e.g. when the
+    // tab is first shown) without overriding the user's scroll afterwards.
+    const hasCenteredOnToday = React.useRef(false);
+    // Set when a bar drag ends so the synthetic click that follows does not also scroll the
+    // row to its task; reset by the next row interaction.
+    const suppressRowClickRef = React.useRef(false);
 
     const [draggingDep, setDraggingDep] = React.useState<{id: string, type: 'start'|'end', projectId: string} | null>(null);
     const [mousePos, setMousePos] = React.useState<{x: number, y: number} | null>(null);
@@ -61,7 +68,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
     const rowOrderRef = React.useRef<string[]>([]);
     rowOrderRef.current = timelineTasks.map(t => t.id);
 
-    // Re-applying the global sort — selecting a new option or re-using the sort control —
+    // Re-applying the global sort (selecting a new option or re-using the sort control)
     // resumes automatic ordering.
     React.useEffect(() => { setFrozenOrder(null); }, [sortOption, sortApplyToken]);
 
@@ -180,6 +187,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
         };
         const onUp = () => {
             if (draggingTask) {
+                suppressRowClickRef.current = true;
                 const draggedId = draggingTask.id;
                 const tempDates = tempTaskDates[draggedId];
                 if (tempDates) {
@@ -192,7 +200,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
                                  startDate: tempDates.start,
                                  dueDate: tempDates.end,
                                  subTasks: updatedTask.subTasks,
-                                 urgency: updatedTask.tags.find(t => ['high','medium','normal','low'].includes(t.toLowerCase())) || 'normal'
+                                 urgency: updatedTask.tags.find(t => ['high','medium','low'].includes(t.toLowerCase())) || 'medium'
                              }
                          });
                     }
@@ -404,9 +412,34 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
     };
 
     React.useEffect(() => {
-        handleScroll();
-        window.addEventListener('resize', handleScroll);
-        return () => window.removeEventListener('resize', handleScroll);
+        /**
+         * Centers the timeline on today the first time it has a real width, so a freshly
+         * opened timeline starts on the current day; later size changes leave the user's
+         * scroll untouched.
+         */
+        const centerOnTodayOnce = () => {
+            if (hasCenteredOnToday.current) return;
+            if (!wrapperRef.current || wrapperRef.current.clientWidth === 0) return;
+            handleJumpTo('today', 'auto');
+            hasCenteredOnToday.current = true;
+        };
+
+        const measure = () => { handleScroll(); centerOnTodayOnce(); };
+
+        measure();
+        window.addEventListener('resize', measure);
+        // A ResizeObserver re-measures when the wrapper gains a real size again, which happens
+        // when the tab becomes visible after being hidden or when the panel is resized; the
+        // mount-time measurement is 0 while the view is hidden.
+        let observer: ResizeObserver | null = null;
+        if (wrapperRef.current && typeof ResizeObserver !== 'undefined') {
+            observer = new ResizeObserver(() => measure());
+            observer.observe(wrapperRef.current);
+        }
+        return () => {
+            window.removeEventListener('resize', measure);
+            if (observer) observer.disconnect();
+        };
     }, [viewDuration, startRange, zoomLevel]);
 
     /**
@@ -604,7 +637,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
      * centered in the viewport.
      * @param target The point to scroll to.
      */
-    const handleJumpTo = (target: 'start' | 'today' | 'end') => {
+    const handleJumpTo = (target: 'start' | 'today' | 'end', behavior: ScrollBehavior = 'smooth') => {
         if (!wrapperRef.current) return;
         const wrapper = wrapperRef.current;
         const viewportWidth = wrapper.clientWidth;
@@ -624,6 +657,30 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
 
         const targetScrollLeft = (targetPercent * scrollWidth) - (viewportWidth / 2);
         
+        wrapper.scrollTo({
+            left: Math.max(0, Math.min(targetScrollLeft, scrollWidth - viewportWidth)),
+            behavior: behavior
+        });
+    };
+
+    /**
+     * Smoothly scrolls the timeline so the given task's bar is centered in the viewport,
+     * which brings into view tasks whose bars sit off-screen, such as overdue tasks that
+     * fall before the current day.
+     * @param task The task to bring into view.
+     */
+    const scrollToTask = (task: Task) => {
+        if (!wrapperRef.current) return;
+        const wrapper = wrapperRef.current;
+        const viewportWidth = wrapper.clientWidth;
+        const scrollWidth = wrapper.scrollWidth;
+
+        const start = tempTaskDates[task.id] ? tempTaskDates[task.id].start : (task.startDate || task.createdTime);
+        const due = tempTaskDates[task.id] ? tempTaskDates[task.id].end : (task.dueDate || start);
+        const midpoint = start + (due - start) / 2;
+        const targetPercent = (midpoint - startRange) / viewDuration;
+        const targetScrollLeft = (targetPercent * scrollWidth) - (viewportWidth / 2);
+
         wrapper.scrollTo({
             left: Math.max(0, Math.min(targetScrollLeft, scrollWidth - viewportWidth)),
             behavior: 'smooth'
@@ -872,8 +929,17 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
                         const isMilestone = effectiveDue - effectiveStart <= 0;
 
                         return (
-                            <div key={task.id} className={`timeline-row ${isOverdue ? 'overdue' : ''} ${isApproaching ? 'approaching' : ''} ${isDroppableTarget ? 'droppable' : ''}`} 
-                                 style={{ height: '60px', position: 'relative', borderBottom: '1px solid var(--joplin-divider-color)', margin: '0 10px', cursor: draggingDep ? 'copy' : 'pointer' }} 
+                            <div key={task.id} className={`timeline-row ${isOverdue ? 'overdue' : ''} ${isApproaching ? 'approaching' : ''} ${isDroppableTarget ? 'droppable' : ''}`}
+                                 style={{ height: '60px', position: 'relative', borderBottom: '1px solid var(--joplin-divider-color)', margin: '0 10px', cursor: draggingDep ? 'copy' : 'pointer' }}
+                                 onMouseDown={() => { suppressRowClickRef.current = false; }}
+                                 onClick={(e) => {
+                                     // Skip the synthetic click that follows a bar drag, the second click of a
+                                     // double-click (which edits), and clicks on dependency handles.
+                                     if (suppressRowClickRef.current) { suppressRowClickRef.current = false; return; }
+                                     if (e.detail > 1) return;
+                                     if ((e.target as HTMLElement).closest('.dep-handle')) return;
+                                     scrollToTask(task);
+                                 }}
                                  onDoubleClick={(e) => { e.stopPropagation(); onEditTask(task); }}
                                  onContextMenu={(e) => handleContextMenu(e, task)}
                                  title={`${task.projectName}\n${task.title}${task.startDate && task.startDate > 0 ? `\nStart: ${formatDate(task.startDate)}` : ''}${task.dueDate! > 0 ? `\n${isOverdue ? '(Overdue) ' : (isApproaching ? '(Approaching) ' : '')}Due: ${formatDate(task.dueDate!)}` : ''}`}>

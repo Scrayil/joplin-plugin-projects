@@ -12,6 +12,24 @@ const logger = Logger.create('Projects: Index');
 const HANDLES = {}
 
 /**
+ * Builds the urgency option markup from the central tag configuration so the dialog
+ * labels always match the tag names used everywhere else, marking the given keyword as
+ * the selected option.
+ * @param selected The urgency keyword to pre-select.
+ * @returns The concatenated option elements.
+ */
+function buildUrgencyOptions(selected: string): string {
+    const levels = [
+        { value: Config.TAGS.KEYWORDS.HIGH, label: Config.TAGS.HIGH },
+        { value: Config.TAGS.KEYWORDS.MEDIUM, label: Config.TAGS.MEDIUM },
+        { value: Config.TAGS.KEYWORDS.LOW, label: Config.TAGS.LOW }
+    ];
+    return levels
+        .map(l => `<option value="${l.value}"${l.value === selected ? ' selected' : ''}>${l.label}</option>`)
+        .join('');
+}
+
+/**
  * Displays the dialog for creating a new project.
  * Handles user input and invokes the project creation logic.
  */
@@ -92,6 +110,7 @@ export async function newTaskDialog(defaultProjectId?: string) {
     }
     
     html = html.replace('<!-- Options will be injected via JS or dynamically generated HTML -->', optionsHtml);
+    html = html.replace('<!-- Urgency options are injected from Config.TAGS to stay consistent with the tag names -->', buildUrgencyOptions(Config.TAGS.KEYWORDS.MEDIUM));
 
     await joplin.views.dialogs.setHtml(dialog, html);
 
@@ -140,7 +159,7 @@ export async function editTaskDialog(task: any) {
 
     html = html.replace('<h1>New Task</h1>', '<h1>Edit Task</h1>');
 
-    html = html.replace('id="taskTitle" name="taskTitle"', `id="taskTitle" name="taskTitle" value="${task.title}" disabled`);
+    html = html.replace('id="taskTitle" name="taskTitle"', `id="taskTitle" name="taskTitle" value="${task.title.replace(/"/g, '&quot;')}"`);
 
     const projectOptions = `<option value="${task.projectId}" selected>${task.projectName}</option>`;
     html = html.replace('id="taskProject" name="taskProject"', `id="taskProject" name="taskProject" disabled`);
@@ -163,20 +182,14 @@ export async function editTaskDialog(task: any) {
         html = html.replace('id="taskStartDate" name="taskStartDate"', `id="taskStartDate" name="taskStartDate" value="${isoStr}"`);
     }
 
-    const urgency = task.tags.find((t: string) => t.toLowerCase().includes('high')) ? 'high' :
-                    (task.tags.find((t: string) => t.toLowerCase().includes('low')) ? 'low' : 'normal');
-    
-    if (urgency === 'high') {
-        html = html.replace('value="high"', 'value="high" selected');
-        html = html.replace('value="normal" selected', 'value="normal"');
-    } else if (urgency === 'low') {
-        html = html.replace('value="low"', 'value="low" selected');
-        html = html.replace('value="normal" selected', 'value="normal"');
-    }
+    const urgency = task.tags.find((t: string) => t.toLowerCase().includes('high')) ? Config.TAGS.KEYWORDS.HIGH :
+                    (task.tags.find((t: string) => t.toLowerCase().includes('low')) ? Config.TAGS.KEYWORDS.LOW : Config.TAGS.KEYWORDS.MEDIUM);
+
+    html = html.replace('<!-- Urgency options are injected from Config.TAGS to stay consistent with the tag names -->', buildUrgencyOptions(urgency));
 
     // Subtasks are passed through a hidden input that the dialog script reads;
     // double quotes are escaped to keep the value attribute well-formed.
-    const subTasksStr = task.subTasks.map((st: any) => '  '.repeat(st.level || 0) + st.title).join('\n');
+    const subTasksStr = task.subTasks.map((st: any) => `${'  '.repeat(st.level || 0)}- [${st.completed ? 'x' : ' '}] ${st.title}`).join('\n');
     html = html.replace('id="taskSubTasks" name="taskSubTasks" value=""', `id="taskSubTasks" name="taskSubTasks" value="${subTasksStr.replace(/"/g, '&quot;')}"`);
 
     await joplin.views.dialogs.setHtml(dialog, html);

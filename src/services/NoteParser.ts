@@ -135,6 +135,69 @@ export class NoteParser {
     }
 
     /**
+     * Sets the state of a single GFM task-list checkbox identified by its zero-based index
+     * in document order, supporting the "-", "*" and "+" list markers and leaving every
+     * other line untouched. No completion cascade is applied, so it suits plain note
+     * checklists rather than task subtasks.
+     * @param body The note markdown.
+     * @param index The zero-based index of the checkbox to set.
+     * @param checked The desired checkbox state.
+     * @returns The updated markdown, or the original body if the index is out of range.
+     */
+    public toggleCheckboxAt(body: string, index: number, checked: boolean): string {
+        if (!body) return body;
+        const lines = body.split('\n');
+        const checkboxRegex = /^(\s*[-*+]\s+\[)([ xX])(\].*)$/;
+        let count = -1;
+        for (let i = 0; i < lines.length; i++) {
+            const match = lines[i].match(checkboxRegex);
+            if (match) {
+                count++;
+                if (count === index) {
+                    lines[i] = `${match[1]}${checked ? 'x' : ' '}${match[3]}`;
+                    break;
+                }
+            }
+        }
+        return lines.join('\n');
+    }
+
+    /**
+     * Enforces the completion invariant that a subtask cannot stay completed while any of
+     * its descendants is incomplete. Every completed subtask that has an incomplete
+     * descendant is cleared, so restructuring the hierarchy never leaves a parent marked
+     * done over unfinished children. Leaf states, titles, and indentation are preserved.
+     * @param body The note markdown.
+     * @returns The markdown with parent completion states normalized.
+     */
+    public normalizeSubTaskHierarchy(body: string): string {
+        if (!body) return body;
+        const tasks = this.parseSubTasks(body);
+        if (tasks.length === 0) return body;
+
+        for (let i = 0; i < tasks.length; i++) {
+            if (!tasks[i].completed) continue;
+            for (let j = i + 1; j < tasks.length && tasks[j].level > tasks[i].level; j++) {
+                if (!tasks[j].completed) {
+                    tasks[i].completed = false;
+                    break;
+                }
+            }
+        }
+
+        const lines = body.split('\n');
+        const newLines = [...lines];
+        for (const task of tasks) {
+            const originalLine = lines[task.originalIndex];
+            const indentMatch = originalLine.match(/^(\s*)-/);
+            const prefix = indentMatch ? indentMatch[1] : '  '.repeat(task.level);
+            const mark = task.completed ? 'x' : ' ';
+            newLines[task.originalIndex] = `${prefix}- [${mark}] ${task.title}`;
+        }
+        return newLines.join('\n');
+    }
+
+    /**
      * Replaces existing subtasks in the note body with a new list.
      * Handles complex replacement while preserving indentation.
      */
@@ -168,17 +231,20 @@ export class NoteParser {
             }
         });
 
+        let rebuilt: string;
         if (firstTaskLine === -1) {
-            if (currentBody.trim().length > 0) {
-                return currentBody + '\n\n' + formattedNewTasks.join('\n');
-            } else {
-                return formattedNewTasks.join('\n');
-            }
+            rebuilt = currentBody.trim().length > 0
+                ? currentBody + '\n\n' + formattedNewTasks.join('\n')
+                : formattedNewTasks.join('\n');
         } else {
             const before = lines.slice(0, firstTaskLine);
             const after = lines.slice(lastTaskLine + 1);
-            return [...before, ...formattedNewTasks, ...after].join('\n');
+            rebuilt = [...before, ...formattedNewTasks, ...after].join('\n');
         }
+
+        // Re-parenting in the editor can leave a completed parent above an incomplete child;
+        // the hierarchy is normalized so such parents are cleared.
+        return this.normalizeSubTaskHierarchy(rebuilt);
     }
 
     /**

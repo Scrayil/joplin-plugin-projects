@@ -1,5 +1,25 @@
 # Changelog
 
+[v1.5.0] - 17/06/26
+### ✨ Features & Enhancements
+- Wiki: internal note links now scroll to the target note within the wiki, or open it in the editor when it lives elsewhere.
+- Wiki: resource and note links are prefixed with type icons (video, audio, PDF, generic file) using Font Awesome with an emoji fallback.
+- Wiki: checkbox toggles in a rendered note are saved back to the source note.
+- Wiki: the reading area flows to the available width, with wide elements scrolling inside their own box.
+- Timeline: opens centered on today, re-measures on resize, and clicking a task row scrolls its bar into view (useful for overdue tasks before today).
+- Dashboard: switching tabs preserves each view's scroll position and state, resetting only when the dashboard is reopened from a hidden state.
+- Dashboard: the sort, urgency, and project controls are disabled in views where they have no effect, and the sort labels were decluttered.
+- Subtasks: the nested completion cascade is reflected instantly across all views, and the Edit dialog marks completed subtasks.
+- The task title is now editable in the GUI Edit dialog.
+- Urgency levels are centralized (High/Medium/Low), removing the leftover "normal" level.
+
+### 🐛 Bug Fixes
+- Subtask completion is preserved through GUI edits and dependency-driven rescheduling, which previously reset checkboxes and flattened nesting.
+- Re-nesting in the dialog normalizes the hierarchy, so a completed parent above an incomplete child is cleared.
+- The Kanban "Expand Subtasks" overlay no longer passes clicks through to cards behind it or hijacks card drag.
+- Rendering wiki note links no longer floods the console with "No such resource" errors.
+- Sorting is deterministic, so toggling a subtask no longer reshuffles cards.
+
 [v1.4.0] - 16/06/26
 ### ✨ Features & Enhancements
 - Reworked the Timeline into a professional, interactive Gantt chart.

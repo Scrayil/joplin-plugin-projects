@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Task, DashboardData } from './types';
+import { Task, DashboardData, SubTask } from './types';
 import KanbanBoard from './components/KanbanBoard';
 import TimelineView from './components/TimelineView';
 import ListView from './components/ListView';
@@ -9,11 +9,55 @@ import WikiView from './components/WikiView';
 import { getPriorityValue } from './utils';
 
 /**
+ * Applies the nested completion cascade for a single subtask toggle, mirroring the backend
+ * so optimistic updates match the persisted result. Checking a subtask completes every
+ * deeper-nested descendant that follows it; unchecking a subtask clears the completion of
+ * each shallower ancestor up to the root, since a parent cannot stay complete while a child
+ * is incomplete. The input array is not mutated.
+ * @param subTasks The current subtasks in document order, carrying their nesting level.
+ * @param targetIndex The index of the toggled subtask.
+ * @param checked The new completion state of the toggled subtask.
+ * @returns A new subtasks array with the cascade applied.
+ */
+const cascadeSubTaskCompletion = (subTasks: SubTask[], targetIndex: number, checked: boolean): SubTask[] => {
+    const next = subTasks.map(st => ({ ...st }));
+    if (targetIndex < 0 || targetIndex >= next.length) return next;
+
+    next[targetIndex].completed = checked;
+
+    if (checked) {
+        for (let i = targetIndex + 1; i < next.length; i++) {
+            if (next[i].level > next[targetIndex].level) next[i].completed = true;
+            else break;
+        }
+    } else {
+        let currentLevel = next[targetIndex].level;
+        let currentIndex = targetIndex;
+        while (currentLevel > 0) {
+            let parentIndex = -1;
+            for (let i = currentIndex - 1; i >= 0; i--) {
+                if (next[i].level < currentLevel) { parentIndex = i; break; }
+            }
+            if (parentIndex === -1) break;
+            next[parentIndex].completed = false;
+            currentIndex = parentIndex;
+            currentLevel = next[parentIndex].level;
+        }
+    }
+
+    return next;
+};
+
+/**
  * Main application component for the Task Dashboard.
  * Manages state, data fetching, and tab switching.
  */
 const App: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'kanban' | 'timeline' | 'table' | 'wiki' | 'info'>('kanban');
+    // Bumped when the dashboard is reopened from a fully hidden state, forcing the view
+    // subtree to remount so each view starts clean; switching tabs keeps the views mounted
+    // and therefore preserves their scroll position and internal state.
+    const [viewSessionKey, setViewSessionKey] = useState(0);
     const [data, setData] = useState<DashboardData>({ projects: [], tasks: [] });
     const [loading, setLoading] = useState(true);
     const [projectFilter, setProjectFilter] = useState<string>('all');
@@ -118,6 +162,9 @@ const App: React.FC = () => {
                 if (message.name === 'dataChanged') {
                     fetchData();
                     updateTheme();
+                } else if (message.name === 'dashboardReset') {
+                    setActiveTab('kanban');
+                    setViewSessionKey(k => k + 1);
                 }
             });
         }
@@ -237,7 +284,10 @@ const App: React.FC = () => {
 
     /**
      * Optimistically updates the completion state of a single subtask in local state,
-     * then persists the change to the backend and refetches on failure.
+     * then persists the change to the backend and refetches on failure. The same nesting
+     * cascade the backend applies is mirrored here so the change is reflected in real time:
+     * checking a subtask completes all of its descendants, while unchecking one clears the
+     * completion of its ancestors up to the root.
      * @param taskId The ID of the task that owns the subtask.
      * @param subTaskIndex The index of the subtask within the task.
      * @param checked The new completion state.
@@ -245,9 +295,7 @@ const App: React.FC = () => {
     const handleToggleSubTask = async (taskId: string, subTaskIndex: number, checked: boolean) => {
         const current = mergedTasks.find(t => t.id === taskId);
         if (!current) return;
-        const newSubTasks = current.subTasks.map((st, i) =>
-            i === subTaskIndex ? { ...st, completed: checked } : st
-        );
+        const newSubTasks = cascadeSubTaskCompletion(current.subTasks, subTaskIndex, checked);
         applyOptimistic(taskId, { subTasks: newSubTasks });
 
         try {
@@ -257,6 +305,7 @@ const App: React.FC = () => {
             fetchData();
         }
     };
+
 
     /**
      * Opens the note backing a task in the Joplin editor.
@@ -320,30 +369,43 @@ const App: React.FC = () => {
             });
         }
         
-        return tasks.sort((a, b) => {
+        // Sorting operates on a copy so the memoized merged list is never mutated, and every
+        // branch ends with a stable tie-break on the task ID. This keeps the order fully
+        // deterministic regardless of the order in which the backend returns tasks, so an
+        // action that merely rewrites a note (e.g. toggling a subtask) never reshuffles cards
+        // that compare equal on the active sort key.
+        return [...tasks].sort((a, b) => {
             if (sortOption === 'dueDate') {
                 const dateA = a.dueDate ? a.dueDate : Number.MAX_VALUE;
                 const dateB = b.dueDate ? b.dueDate : Number.MAX_VALUE;
                 if (dateA !== dateB) return dateA - dateB;
-                return getPriorityValue(a.tags) - getPriorityValue(b.tags);
+                return (getPriorityValue(a.tags) - getPriorityValue(b.tags)) || a.id.localeCompare(b.id);
             } else if (sortOption === 'startDate') {
                 const startA = a.startDate || a.createdTime;
                 const startB = b.startDate || b.createdTime;
                 if (startA !== startB) return startA - startB;
-                return (a.dueDate || Number.MAX_VALUE) - (b.dueDate || Number.MAX_VALUE);
+                return ((a.dueDate || Number.MAX_VALUE) - (b.dueDate || Number.MAX_VALUE)) || a.id.localeCompare(b.id);
             } else if (sortOption === 'priority') {
                 const prioA = getPriorityValue(a.tags);
                 const prioB = getPriorityValue(b.tags);
                 if (prioA !== prioB) return prioA - prioB;
-                return (a.dueDate || Number.MAX_VALUE) - (b.dueDate || Number.MAX_VALUE);
+                return ((a.dueDate || Number.MAX_VALUE) - (b.dueDate || Number.MAX_VALUE)) || a.id.localeCompare(b.id);
             } else if (sortOption === 'createdTime') {
-                return b.createdTime - a.createdTime;
+                return (b.createdTime - a.createdTime) || a.id.localeCompare(b.id);
             }
-            return 0;
+            return a.id.localeCompare(b.id);
         });
     }, [mergedTasks, projectFilter, showUrgentOnly, sortOption]);
 
     if (loading) return <div>Loading tasks...</div>;
+
+    // Task-oriented controls have no effect outside the task views: sorting and the urgency
+    // filter are inert in the Wiki and Guide tabs, and the project filter is meaningless in
+    // the Guide tab. They are disabled there and re-enabled automatically on returning to a
+    // view where they apply.
+    const sortDisabled = activeTab === 'wiki' || activeTab === 'info';
+    const urgencyDisabled = activeTab === 'wiki' || activeTab === 'info';
+    const projectFilterDisabled = activeTab === 'info';
 
     return (
         <div className="dashboard-container">
@@ -351,10 +413,13 @@ const App: React.FC = () => {
                 <div className="controls-container">
                     {data.projects.length > 1 ? (
                         <div className="select-wrapper">
-                            <select 
+                            <select
                                 className="project-filter-select"
-                                value={projectFilter} 
+                                value={projectFilter}
                                 onChange={(e) => setProjectFilter(e.target.value)}
+                                disabled={projectFilterDisabled}
+                                style={{ opacity: projectFilterDisabled ? 0.4 : undefined, cursor: projectFilterDisabled ? 'not-allowed' : undefined }}
+                                title={projectFilterDisabled ? 'Project selection is unavailable in this view' : undefined}
                             >
                                 <option value="all">All Tasks</option>
                                 {data.projects.map(p => (
@@ -371,12 +436,14 @@ const App: React.FC = () => {
                             value={sortOption}
                             onChange={(e) => setSortOption(e.target.value)}
                             onClick={() => setSortApplyToken(v => v + 1)}
-                            title="Sort by"
+                            disabled={sortDisabled}
+                            style={{ opacity: sortDisabled ? 0.4 : undefined, cursor: sortDisabled ? 'not-allowed' : undefined }}
+                            title={sortDisabled ? 'Sorting is unavailable in this view' : 'Sort by'}
                         >
-                            <option value="dueDate">Sort by Due Date</option>
-                            <option value="startDate">Sort by Start Date</option>
-                            <option value="priority">Sort by Priority</option>
-                            <option value="createdTime">Sort by Created Time</option>
+                            <option value="dueDate">Due Date</option>
+                            <option value="startDate">Start Date</option>
+                            <option value="priority">Priority</option>
+                            <option value="createdTime">Created Time</option>
                         </select>
                     </div>
                     <button 
@@ -387,16 +454,19 @@ const App: React.FC = () => {
                     >
                         +
                     </button>
-                    <button 
+                    <button
                         className="action-btn"
-                        onClick={() => setShowUrgentOnly(!showUrgentOnly)} 
-                        style={{ 
+                        onClick={() => setShowUrgentOnly(!showUrgentOnly)}
+                        disabled={urgencyDisabled}
+                        style={{
                             fontSize: '1rem',
                             backgroundColor: showUrgentOnly ? 'var(--prj-overdue)' : undefined,
                             color: showUrgentOnly ? 'white' : undefined,
-                            borderColor: showUrgentOnly ? 'var(--prj-overdue)' : undefined
+                            borderColor: showUrgentOnly ? 'var(--prj-overdue)' : undefined,
+                            opacity: urgencyDisabled ? 0.4 : undefined,
+                            cursor: urgencyDisabled ? 'not-allowed' : undefined
                         }}
-                        title="Show only urgent tasks (Overdue & Approaching)"
+                        title={urgencyDisabled ? 'Urgency filter is unavailable in this view' : 'Show only urgent tasks (Overdue & Approaching)'}
                     >
                         🚨
                     </button>
@@ -449,33 +519,48 @@ const App: React.FC = () => {
             </div>
             
             <div className="content">
-                {activeTab === 'kanban' && <KanbanBoard 
-                    tasks={displayedTasks} 
-                    onUpdateStatus={handleUpdateStatus}
-                    onToggleSubTask={handleToggleSubTask}
-                    onOpenNote={handleOpenNote}
-                    onEditTask={handleOpenEditTaskDialog}
-                />}
-                {activeTab === 'timeline' && <TimelineView
-                    tasks={displayedTasks}
-                    sortOption={sortOption}
-                    sortApplyToken={sortApplyToken}
-                    onOpenNote={handleOpenNote}
-                    onEditTask={handleOpenEditTaskDialog}
-                    onUpdateDependencies={handleUpdateDependencies}
-                />}
-                {activeTab === 'table' && <ListView 
-                    tasks={displayedTasks} 
-                    onOpenNote={handleOpenNote} 
-                    onEditTask={handleOpenEditTaskDialog}
-                />}
-                {activeTab === 'wiki' && <WikiView 
-                    projectId={projectFilter}
-                    onOpenNote={handleOpenNote}
-                    onToggleSubTask={handleToggleSubTask}
-                    lastUpdated={lastUpdated}
-                />}
-                {activeTab === 'info' && <InfoView />}
+                {/* All views stay mounted and are shown/hidden via display so that switching
+                    tabs preserves each view's scroll position and internal state. The keyed
+                    wrapper remounts the whole subtree on a dashboard reset (full reopen). */}
+                <div key={viewSessionKey} style={{ height: '100%' }}>
+                    <div style={{ height: '100%', display: activeTab === 'kanban' ? 'block' : 'none' }}>
+                        <KanbanBoard
+                            tasks={displayedTasks}
+                            onUpdateStatus={handleUpdateStatus}
+                            onToggleSubTask={handleToggleSubTask}
+                            onOpenNote={handleOpenNote}
+                            onEditTask={handleOpenEditTaskDialog}
+                        />
+                    </div>
+                    <div style={{ height: '100%', display: activeTab === 'timeline' ? 'block' : 'none' }}>
+                        <TimelineView
+                            tasks={displayedTasks}
+                            sortOption={sortOption}
+                            sortApplyToken={sortApplyToken}
+                            onOpenNote={handleOpenNote}
+                            onEditTask={handleOpenEditTaskDialog}
+                            onUpdateDependencies={handleUpdateDependencies}
+                        />
+                    </div>
+                    <div style={{ height: '100%', display: activeTab === 'table' ? 'block' : 'none' }}>
+                        <ListView
+                            tasks={displayedTasks}
+                            onOpenNote={handleOpenNote}
+                            onEditTask={handleOpenEditTaskDialog}
+                        />
+                    </div>
+                    <div style={{ height: '100%', display: activeTab === 'wiki' ? 'block' : 'none' }}>
+                        <WikiView
+                            projectId={projectFilter}
+                            onOpenNote={handleOpenNote}
+                            lastUpdated={lastUpdated}
+                            isActive={activeTab === 'wiki'}
+                        />
+                    </div>
+                    <div style={{ height: '100%', display: activeTab === 'info' ? 'block' : 'none' }}>
+                        <InfoView />
+                    </div>
+                </div>
             </div>
         </div>
     );

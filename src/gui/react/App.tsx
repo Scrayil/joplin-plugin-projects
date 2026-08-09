@@ -70,6 +70,10 @@ const App: React.FC = () => {
     const isFetching = React.useRef(false);
     const isDialogOpen = React.useRef(false);
 
+    // Stale dashboard indicators
+    const [staleSince, setStaleSince] = useState<number | null>(null);
+    const failures = React.useRef(0);
+
     // Optimistic overlay: per-task patches applied on top of server data so every view
     // reflects an action instantly. They are kept for a short window so the background
     // poll cannot revert a fresh action, then expire once the backend has caught up.
@@ -85,6 +89,12 @@ const App: React.FC = () => {
         isFetching.current = true;
         try {
             const response = await window.webviewApi.postMessage({ name: 'getData' });
+            // Keeps the previous data in case of errors. E.G.: undefined responses
+            // If no data is being retrieved, updates the stale indicator
+            if (!response) {
+                if (++failures.current >= 3) setStaleSince(s => s ?? Date.now());
+                return;
+            }
             // Skip the state update (and the re-render/re-sort it triggers) when the
             // polled data is unchanged, keeping the poll non-destructive.
             const serialized = JSON.stringify(response);
@@ -92,6 +102,9 @@ const App: React.FC = () => {
                 lastDataStr.current = serialized;
                 setData(response);
             }
+
+            failures.current = 0;
+            setStaleSince(null);
             setLastUpdated(Date.now());
             // Expire optimistic patches old enough for the backend to have caught up.
             setPendingPatches(prev => {
@@ -108,6 +121,7 @@ const App: React.FC = () => {
             });
         } catch (error) {
             console.error('Error fetching data:', error);
+            if (++failures.current >= 3) setStaleSince(s => s ?? Date.now());
         } finally {
             setLoading(false);
             isFetching.current = false;
@@ -571,6 +585,31 @@ const App: React.FC = () => {
                     </div>
                 </div>
             </div>
+            {staleSince && (
+                <div
+                    title={`Dashboard is not refreshing.\nLast successful update: ${new Date(lastUpdated).toLocaleTimeString()}`}
+                    style={{
+                        position: 'fixed',
+                        bottom: '12px',
+                        right: '12px',
+                        zIndex: 9999,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        padding: '0.3rem 0.6rem',
+                        borderRadius: '999px',
+                        fontSize: '0.75rem',
+                        whiteSpace: 'nowrap',
+                        cursor: 'default',
+                        color: 'var(--joplin-color-error, #d9534f)',
+                        backgroundColor: 'var(--joplin-background-color3, rgba(0,0,0,0.6))',
+                        border: '1px solid var(--joplin-color-error, #d9534f)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                    }}
+                >
+                    ⚠️ Not updating
+                </div>
+            )}
         </div>
     );
 };

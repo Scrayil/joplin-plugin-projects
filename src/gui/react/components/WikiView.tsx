@@ -250,7 +250,7 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated,
             if (wikiData.length === 0) setLoading(true);
             try {
                 const data = await window.webviewApi.postMessage({ name: 'getWikiData', payload: { projectId } });
-                if (mounted) setWikiData(data);
+                if (mounted && data) setWikiData(data);
             } catch (e) {
                 console.error("Error loading wiki", e);
             } finally { if (mounted) setLoading(false); }

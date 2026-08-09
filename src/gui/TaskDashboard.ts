@@ -119,6 +119,7 @@ export class TaskDashboard {
                     return;
                 }
             } catch (error) {
+                // Prints the error in the plugin's own console
                 console.error(`TaskDashboard: Error handling message ${message.name}:`, error);
             }
         });

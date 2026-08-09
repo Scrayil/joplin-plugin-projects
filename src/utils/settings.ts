@@ -13,16 +13,6 @@ export const registerSettings = async () => {
     });
 
     await joplin.settings.registerSettings({
-        [Config.SETTINGS.PROJECT_WIKI_TEMPLATE]: {
-            value: '',
-            type: SettingItemType.String,
-            subType: SettingItemSubType.FilePath,
-            section: Config.SETTINGS.PROJECT_SECTION,
-            public: true,
-            label: "Project Wiki template structure (.json)",
-            description: "Select the .json file that defines the custom folder structure for new project wikis. Leave empty for default.",
-            advanced: true
-        },
         [Config.SETTINGS.PROJECT_APPROACHING_DEADLINE]: {
             value: 7,
             type: SettingItemType.Int,
@@ -32,6 +22,28 @@ export const registerSettings = async () => {
             public: true,
             label: "Approaching deadline warning (days)",
             description: "Tasks due within this number of days will be highlighted in orange."
+        },
+        [Config.SETTINGS.PROJECT_POLLING_INTERVAL]: {
+            value: 3000,
+            type: SettingItemType.Int,
+            minimum: 1000,
+            maximum: 60000,
+            step: 1000,
+            section: Config.SETTINGS.PROJECT_SECTION,
+            public: true,
+            label: "Dashboard refresh interval (ms)",
+            description: "How often the dashboard polls for changes made outside the plugin. Raise on very large collections.",
+            advanced: true,
+        },
+        [Config.SETTINGS.PROJECT_WIKI_TEMPLATE]: {
+            value: '',
+            type: SettingItemType.String,
+            subType: SettingItemSubType.FilePath,
+            section: Config.SETTINGS.PROJECT_SECTION,
+            public: true,
+            label: "Project Wiki template structure (.json)",
+            description: "Select the .json file that defines the custom folder structure for new project wikis. Leave empty for default.",
+            advanced: true
         }
     });
 

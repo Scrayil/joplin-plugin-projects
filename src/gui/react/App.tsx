@@ -114,46 +114,49 @@ const App: React.FC = () => {
         }
     }, []);
 
+    /**
+     * Detects the active Joplin theme from the editor text color and applies the
+     * matching color scheme and theme classes to the document.
+     */
+    const updateTheme = React.useCallback(() => {
+        const textColor = getComputedStyle(document.body).getPropertyValue('--joplin-color').trim();
+        let isDarkTheme = false;
+
+        let r=0, g=0, b=0;
+        if (textColor.startsWith('#')) {
+            const hex = textColor.substring(1);
+            r = parseInt(hex.substring(0, 2), 16);
+            g = parseInt(hex.substring(2, 4), 16);
+            b = parseInt(hex.substring(4, 6), 16);
+        } else if (textColor.startsWith('rgb')) {
+            const parts = textColor.match(/\d+/g);
+            if (parts && parts.length >= 3) {
+                r = parseInt(parts[0]);
+                g = parseInt(parts[1]);
+                b = parseInt(parts[2]);
+            }
+        }
+
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        // Bright editor text indicates a dark theme.
+        if (brightness > 128) isDarkTheme = true;
+
+        document.documentElement.style.colorScheme = isDarkTheme ? 'dark' : 'light';
+        document.documentElement.style.setProperty('accent-color', 'var(--joplin-selected-color)');
+
+        if (isDarkTheme) {
+            document.body.classList.add('theme-dark');
+            document.body.classList.remove('theme-light');
+        } else {
+            document.body.classList.add('theme-light');
+            document.body.classList.remove('theme-dark');
+        }
+    }, []);
+
+    /**
+     * Detects note changes made outside the plugin, and uses fetched data to update the dashboard appearance and content.
+     */
     useEffect(() => {
-        /**
-         * Detects the active Joplin theme from the editor text color and applies the
-         * matching color scheme and theme classes to the document.
-         */
-        const updateTheme = () => {
-            const textColor = getComputedStyle(document.body).getPropertyValue('--joplin-color').trim();
-            let isDarkTheme = false;
-            
-            let r=0, g=0, b=0;
-            if (textColor.startsWith('#')) {
-                const hex = textColor.substring(1);
-                r = parseInt(hex.substring(0, 2), 16);
-                g = parseInt(hex.substring(2, 4), 16);
-                b = parseInt(hex.substring(4, 6), 16);
-            } else if (textColor.startsWith('rgb')) {
-                const parts = textColor.match(/\d+/g);
-                if (parts && parts.length >= 3) {
-                    r = parseInt(parts[0]);
-                    g = parseInt(parts[1]);
-                    b = parseInt(parts[2]);
-                }
-            }
-            
-            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-            // Bright editor text indicates a dark theme.
-            if (brightness > 128) isDarkTheme = true;
-
-            document.documentElement.style.colorScheme = isDarkTheme ? 'dark' : 'light';
-            document.documentElement.style.setProperty('accent-color', 'var(--joplin-selected-color)');
-            
-            if (isDarkTheme) {
-                document.body.classList.add('theme-dark');
-                document.body.classList.remove('theme-light');
-            } else {
-                document.body.classList.add('theme-light');
-                document.body.classList.remove('theme-dark');
-            }
-        };
-
         updateTheme();
         fetchData();
 
@@ -168,13 +171,19 @@ const App: React.FC = () => {
                 }
             });
         }
+    }, [fetchData, updateTheme]);
 
-        const interval = setInterval(() => { 
-            fetchData(); 
+    /**
+     * Starts an interval timer that periodically updates the plugin's dashboard keeping it aligned with the actual notes.
+     */
+    const pollMs = (data as any)?.config?.pollingInterval ?? 3000;
+    useEffect(() => {
+        const interval = setInterval(() => {
+            fetchData();
             updateTheme();
-        }, 3000);
+        }, pollMs);
         return () => clearInterval(interval);
-    }, [fetchData]);
+    }, [fetchData, updateTheme, pollMs]);
 
     /**
      * Validates the selected project filter against the available projects and falls

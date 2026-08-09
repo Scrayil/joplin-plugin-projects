@@ -87,42 +87,31 @@ export class TagService {
     }
 
     /**
-     * Retrieves the tag titles associated with each of the given notes, processing
-     * them in fixed-size batches. Notes whose tag lookup fails are omitted from the
-     * result.
+     * Retrieves the tag titles associated with each of the given notes.
+     *
+     * The query is inverted: one request per tag rather than one per note because the Data API exposes no bulk
+     * note-to-tag endpoint, and this runs on every dashboard refresh.
+     * Collections have far fewer tags than notes, so the inversion is typically way cheaper. It is only worse for a
+     * collection holding more tags than notes. See the GitHub #46 and #47 issues for the regression linked to this.
+     *
      * @param noteIds The IDs of the notes whose tags are retrieved.
-     * @returns A map from note ID to its array of tag titles.
+     * @returns A map from note ID to its array of tag titles. Notes with no tags are excluded from the map.
      */
     public async getTagsForNotes(noteIds: string[]): Promise<Map<string, string[]>> {
-        const noteTagsMap = new Map<string, string[]>();
-        const batchSize = 10;
-        
-        for (let i = 0; i < noteIds.length; i += batchSize) {
-            const batch = noteIds.slice(i, i + batchSize);
-            const promises = batch.map(id => this.fetchTagsForNote(id));
-            
-            const results = await Promise.allSettled(promises);
-            
-            results.forEach(result => {
-                if (result.status === 'fulfilled') {
-                    const { id, tags } = result.value;
-                    noteTagsMap.set(id, tags);
-                }
-            });
-        }
-        
-        return noteTagsMap;
-    }
+        const wanted = new Set(noteIds);
+        const map = new Map<string, string[]>();
+        const tags = await fetchAllItems(['tags'], { fields: ['id', 'title'] });
 
-    /**
-     * Helper to fetch tags for a single note.
-     */
-    private async fetchTagsForNote(noteId: string): Promise<{ id: string, tags: string[] }> {
-        const tags = await fetchAllItems(['notes', noteId, 'tags'], { fields: ['title'] });
-        return {
-            id: noteId,
-            tags: tags.map((t: any) => t.title)
-        };
+        for (const tag of tags) {
+            const tagged = await fetchAllItems(['tags', tag.id, 'notes'], { fields: ['id']});
+            for (const note of tagged) {
+                if (!wanted.has(note.id)) continue;
+                const list = map.get(note.id) ?? [];
+                list.push(tag.title);
+                map.set(note.id, list);
+            }
+        }
+        return map;
     }
 
     /**

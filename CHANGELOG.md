@@ -1,5 +1,20 @@
 # Changelog
 
+[v1.5.1] - 09/08/26
+### ⚡ Performance
+- Dashboard refreshes now fetch tags once per tag rather than once per note, cutting API calls per refresh by roughly 10 times on a typical collection.
+- The wiki fetches the resource index once per load instead of once per note containing attachments.
+- Selecting a different note no longer invalidates the dashboard cache. The existing content signature already covers every change that matters.
+
+### ✨ Features & Enhancements
+- New advanced setting: the dashboard refresh interval, defaulting to the previous 3 seconds.
+- The dashboard shows an indicator when consecutive refreshes have failed, so a stalled panel is no longer silently stale.
+
+### 🐛 Bug Fixes
+- A failed refresh no longer replaces the dashboard with an empty state. The previous content is kept.
+- The wiki view no longer breaks when a load fails.
+- Resource links copied from another note are now resolved instead of being eft broken.
+
 [v1.5.0] - 17/06/26
 ### ✨ Features & Enhancements
 - Wiki: internal note links now scroll to the target note within the wiki, or open it in the editor when it lives elsewhere.

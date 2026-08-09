@@ -146,7 +146,6 @@ export class TaskDashboard {
         await joplin.workspace.onNoteSelectionChange(async () => {
             const isVisible = await joplin.views.panels.visible(this.panelHandle);
             if (isVisible) {
-                this.projectService.invalidateCache();
                 await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
             }
         });

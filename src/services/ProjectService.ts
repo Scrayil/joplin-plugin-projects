@@ -119,9 +119,10 @@ export class ProjectService {
         const tagsMap = await this.tagService.getTagsForNotes(noteIds);
 
         let tagsSignature = '';
-        tagsMap.forEach((tags, id) => {
-            tagsSignature += `${id}:${tags.sort().join(',')}|`;
-        });
+        for (const id of noteIds) {
+            const tags = tagsMap.get(id);
+            if (tags) tagsSignature += `${id}:${tags.sort().join(',')}|`;
+        }
 
         let maxProjectUpdated = 0;
         let projectsIdStr = '';
@@ -206,18 +207,19 @@ export class ProjectService {
             });
         }
 
+        const pollingInterval = Number(await getSettingValue(Config.SETTINGS.PROJECT_POLLING_INTERVAL)) || 3000;
         const data = {
             projects: projectFolders
                 .sort((a, b) => sanitizeTitle(a.title).localeCompare(sanitizeTitle(b.title), undefined, { sensitivity: 'accent' }))
                 .map((p: any) => ({ id: p.id, name: p.title })),
             tasks: dashboardTasks,
             config: {
-                pollingInterval: 3000
+                pollingInterval: pollingInterval
             }
         };
         
         this.dashboardCache = data;
-        this.lastSignature = currentSignature + `-${approachingDays}`; // Invalidate on setting change
+        this.lastSignature = currentSignature + `-${approachingDays}-${pollingInterval}`; // Invalidate on setting change
         
         return data;
     }
@@ -468,8 +470,19 @@ export class ProjectService {
         // Only notes carry a body; folders act as headers. Items are shared by
         // reference with flatList, so mutating them here updates the returned list.
         const noteItems = flatList.filter(item => item.type === 'note');
-        const batchSize = 20;
 
+        let resourceMimeCache: Map<string, string>;
+        const getResourceMimes = async (): Promise<Map<string, string>> => {
+            if (!resourceMimeCache) {
+                const all = await fetchAllItems(['resources'], {fields: ['id', 'mime']});
+                resourceMimeCache = new Map<string, string>(
+                    all.map((res: any) => [res.id, res.mime || ''])
+                );
+            }
+            return resourceMimeCache;
+        };
+
+        const batchSize = 20;
         for (let i = 0; i < noteItems.length; i += batchSize) {
             const batch = noteItems.slice(i, i + batchSize);
             await Promise.all(batch.map(async (item) => {
@@ -493,10 +506,7 @@ export class ProjectService {
                         // attached resources are listed first so that note links are never sent
                         // to the resource API, which would otherwise log a "No such resource"
                         // error for every internal note link in the wiki.
-                        const noteResources = await fetchAllItems(['notes', item.id, 'resources'], { fields: ['id', 'mime'] });
-                        const mimeByResourceId = new Map<string, string>(
-                            noteResources.map((res: any) => [res.id, res.mime || ''])
-                        );
+                        const mimeByResourceId = await getResourceMimes();
 
                         await Promise.all(uniqueIds.map(async (id) => {
                             // IDs absent from the note's resource set are internal note links and

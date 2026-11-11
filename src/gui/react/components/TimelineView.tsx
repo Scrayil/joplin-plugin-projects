@@ -191,19 +191,15 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
                 const draggedId = draggingTask.id;
                 const tempDates = tempTaskDates[draggedId];
                 if (tempDates) {
-                    const updatedTask = tasks.find(t => t.id === draggedId);
-                    if (updatedTask) {
-                         window.webviewApi.postMessage({
-                             name: 'updateTaskDates',
-                             payload: {
-                                 taskId: draggedId,
-                                 startDate: tempDates.start,
-                                 dueDate: tempDates.end,
-                                 subTasks: updatedTask.subTasks,
-                                 urgency: updatedTask.tags.find(t => ['high','medium','low'].includes(t.toLowerCase())) || 'medium'
-                             }
-                         });
-                    }
+                    // Only the dates are sent: the backend writes nothing else (#53).
+                    window.webviewApi.postMessage({
+                        name: 'updateTaskDates',
+                        payload: {
+                            taskId: draggedId,
+                            startDate: tempDates.start,
+                            dueDate: tempDates.end
+                        }
+                    });
                     // Freeze the current row order so the date change does not reshuffle rows.
                     setFrozenOrder(rowOrderRef.current.slice());
                 }

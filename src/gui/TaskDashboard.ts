@@ -386,58 +386,85 @@ export class TaskDashboard {
     }
 
     /**
-     * Updates only the dates of a task directly from Timeline drag-and-drop operations,
-     * and cascades the changes to dependent tasks.
+     * Writes the dates of a task dropped or resized on the Timeline, then shifts the tasks
+     * that depend on it by the same amount.
+     *
+     * Only the dates are written: the note body, the tags and therefore the urgency are
+     * left untouched (#53). No success toast is shown. Any failure is reported with a
+     * single error toast, and the dashboard is refreshed in every case so it reflects
+     * what was actually saved. Dependents already shifted before a failure keep their
+     * new dates, since the Data API offers no transaction to roll them back.
+     *
+     * @param payload The task ID and its new start and due dates, in milliseconds since
+     *   the epoch. A start date of 0 removes the stored start date.
      */
-    private async updateTaskDates(payload: { taskId: string, startDate: number, dueDate: number, subTasks: string[], urgency: string }) {
-        // The original task is fetched first so the time delta can be computed.
-        const originalNote = await getNote(payload.taskId, ['todo_due', 'application_data']);
-        let originalStart = 0;
-        let originalDue = originalNote.todo_due || 0;
-        if (originalNote.application_data) {
-            try {
-                const appData = JSON.parse(originalNote.application_data);
-                originalStart = appData['joplin-plugin-projects']?.startDate || 0;
-            } catch(e) {}
-        }
+    private async updateTaskDates(payload: { taskId: string, startDate: number, dueDate: number }) {
+        try {
+            const originalNote = await getNote(payload.taskId, ['todo_due']);
+            // The due date is the reference point for the shift applied to dependents.
+            const deltaMs = payload.dueDate - (originalNote.todo_due || 0);
 
-        // The delta is measured against the due date as the reference point.
-        const deltaMs = payload.dueDate - originalDue;
+            await this.writeTaskDates(payload.taskId, payload.startDate, payload.dueDate);
 
-        // updateTask is reused so metadata and tags stay in sync.
-        await this.updateTask(payload.taskId, {
-            subTasks: payload.subTasks,
-            urgency: payload.urgency,
-            dueDate: payload.dueDate,
-            startDate: payload.startDate
-        });
-
-        if (deltaMs !== 0) {
-            // A visited set guards against infinite loops caused by circular dependencies.
-            const visited = new Set<string>();
-            visited.add(payload.taskId);
-
-            // Each task stores the IDs of the tasks it depends on, so the reverse
-            // dependencies (tasks depending on the moved one) are found by scanning
-            // every task's dependsOn array.
-            try {
-                const allData = await this.projectService.getDashboardData();
-                const allTasks = allData.tasks;
+            if (deltaMs !== 0) {
+                const allTasks = (await this.projectService.getDashboardData()).tasks;
+                // The visited set guards against circular dependencies.
+                const visited = new Set<string>([payload.taskId]);
                 await this.cascadeTaskUpdate(payload.taskId, deltaMs, allTasks, visited);
-            } catch (err) {
-                console.error("TaskDashboard: Error in cascading updates", err);
             }
+        } catch (error) {
+            console.error('TaskDashboard: Error updating task dates:', error);
+            await joplin.views.dialogs.showToast({ message: "Error updating task dates", duration: 3000, type: ToastType.Error });
+        } finally {
+            await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
         }
-
-        await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
     }
 
     /**
-     * Recursively shifts dates for tasks that depend on the given taskId.
-     * @param sourceTaskId The ID of the task that was moved
-     * @param deltaMs The amount of time to shift dependent tasks by
-     * @param allTasks The complete list of tasks to query against
-     * @param visited Set of task IDs already updated in this chain (prevents circular loops)
+     * Writes the due date and the start date of a task, and nothing else.
+     *
+     * The start date lives in the plugin namespace of the note application_data; any
+     * other key stored there is preserved. Errors are not caught here, so the caller
+     * decides how to report them.
+     *
+     * @param taskId The ID of the task note.
+     * @param startDate The start date in milliseconds since the epoch, or 0 to remove it.
+     * @param dueDate The due date in milliseconds since the epoch, or 0 for no due date.
+     * @throws When the note cannot be read or written, or its application_data holds
+     *   invalid JSON (overwriting it would discard data written by others).
+     */
+    private async writeTaskDates(taskId: string, startDate: number, dueDate: number): Promise<void> {
+        const note = await getNote(taskId, ['application_data']);
+        const appData = note.application_data ? JSON.parse(note.application_data) : {};
+        const pluginData = appData['joplin-plugin-projects'] || {};
+
+        if (startDate > 0) {
+            pluginData.startDate = startDate;
+        } else {
+            delete pluginData.startDate;
+        }
+        appData['joplin-plugin-projects'] = pluginData;
+
+        await updateNote(taskId, {
+            todo_due: dueDate,
+            application_data: JSON.stringify(appData)
+        });
+    }
+
+    /**
+     * Recursively shifts the dates of the tasks that depend on the given task. Only the
+     * dates are written, through writeTaskDates.
+     *
+     * Every dependent is shifted by the same delta, whatever its dependency type, so the
+     * relative schedule is preserved. The dates are resolved as the Timeline draws them:
+     * a missing start date falls back to the creation time, a missing due date to the
+     * start date.
+     *
+     * @param sourceTaskId The ID of the task that was moved.
+     * @param deltaMs The amount of time, in milliseconds, to shift dependent tasks by.
+     * @param allTasks The complete list of dashboard tasks, read before the shift.
+     * @param visited The IDs already shifted in this chain, which prevents circular loops.
+     * @throws When a dependent task cannot be written; the remaining ones are not shifted.
      */
     private async cascadeTaskUpdate(sourceTaskId: string, deltaMs: number, allTasks: any[], visited: Set<string>) {
         const dependentTasks = allTasks.filter(t =>
@@ -446,29 +473,16 @@ export class TaskDashboard {
 
         for (const targetTask of dependentTasks) {
             if (visited.has(targetTask.id)) continue;
-
-            const depRelation = targetTask.dependsOn.find((d: any) => d.id === sourceTaskId);
-            if (!depRelation) continue;
+            visited.add(targetTask.id);
 
             const targetStart = targetTask.startDate || targetTask.createdTime;
             const targetDue = targetTask.dueDate || targetStart;
 
-            // Dependent tasks are shifted by the same delta to preserve the relative
-            // schedule; computing exact gaps per FS/SS/FF/SF type would be more precise
-            // but uniform shifting yields a smoother experience.
-            const newTargetStart = targetStart > 0 ? targetStart + deltaMs : targetStart;
-            const newTargetDue = targetDue > 0 ? targetDue + deltaMs : targetDue;
-
-            visited.add(targetTask.id);
-
-            await this.updateTask(targetTask.id, {
-                // The full subtask objects are forwarded so their completion state and nesting
-                // level are preserved when the markdown body is rebuilt.
-                subTasks: targetTask.subTasks,
-                urgency: targetTask.tags.find((t: string) => ['high','medium','low'].includes(t.toLowerCase())) || Config.TAGS.KEYWORDS.MEDIUM,
-                dueDate: newTargetDue,
-                startDate: newTargetStart
-            });
+            await this.writeTaskDates(
+                targetTask.id,
+                targetStart > 0 ? targetStart + deltaMs : targetStart,
+                targetDue > 0 ? targetDue + deltaMs : targetDue
+            );
 
             await this.cascadeTaskUpdate(targetTask.id, deltaMs, allTasks, visited);
         }

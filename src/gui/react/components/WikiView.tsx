@@ -231,7 +231,7 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated,
         return saved !== null ? saved === 'true' : true;
     });
 
-    const [activeMedia, setActiveMedia] = useState<{ url: string; type: 'video' | 'audio'; name: string } | null>(null);
+    const [activeMedia, setActiveMedia] = useState<{ url: string; type: 'video' | 'audio' | 'pdf'; name: string } | null>(null);
     const contentRef = useRef<HTMLDivElement>(null);
 
     const wikiTree = useMemo(() => buildTree(wikiData), [wikiData]);
@@ -391,8 +391,12 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated,
 
     /**
      * Handles clicks within the rendered wiki content: navigating internal note links,
-     * opening local video and audio resources in the inline media player, and persisting
-     * note checkbox toggles back to the source note.
+     * opening local video, audio and PDF resources in the inline viewer, delegating every
+     * other local resource to Joplin, and persisting note checkbox toggles back to the
+     * source note.
+     *
+     * A local resource link is never followed by the panel itself: navigating the panel
+     * webview to a file would replace the dashboard with no way back.
      * @param e The click event.
      */
     const handleContentClick = (e: React.MouseEvent) => {
@@ -416,19 +420,30 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated,
 
             const href = anchor.href;
             if (href.startsWith('file://')) {
-                let type: 'video' | 'audio' | null = null;
+                e.preventDefault();
                 let mime = '';
+                let resourceId = '';
                 try {
-                    const urlObj = new URL(href);
-                    const hashParams = new URLSearchParams(urlObj.hash.substring(1));
+                    const hashParams = new URLSearchParams(new URL(href).hash.substring(1));
                     mime = hashParams.get('mime') || '';
-                } catch (err) {}
+                    resourceId = hashParams.get('id') || '';
+                } catch (err) {
+                    // A malformed URI carries no metadata and is handed to Joplin as is.
+                }
+
+                let type: 'video' | 'audio' | 'pdf' | null = null;
                 if (mime.startsWith('video/')) type = 'video';
                 else if (mime.startsWith('audio/')) type = 'audio';
+                else if (mime === 'application/pdf') type = 'pdf';
+
                 if (type) {
-                    e.preventDefault();
                     setActiveMedia({ url: href.split('#')[0], type: type, name: anchor.innerText || 'Media' });
+                } else {
+                    // Joplin resolves a resource link to the attachment and opens it with
+                    // the system default application.
+                    window.webviewApi.postMessage({ name: 'openItem', payload: resourceId ? `:/${resourceId}` : href.split('#')[0] });
                 }
+                return;
             }
         }
 
@@ -512,6 +527,7 @@ const WikiView: React.FC<WikiViewProps> = ({ projectId, onOpenNote, lastUpdated,
                     <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', background: '#000' }}>
                         {activeMedia.type === 'video' && <video controls autoPlay src={activeMedia.url} style={{ maxWidth: '100%', maxHeight: '100%' }} />}
                         {activeMedia.type === 'audio' && <audio controls autoPlay src={activeMedia.url} style={{ width: '80%' }} />}
+                        {activeMedia.type === 'pdf' && <iframe src={activeMedia.url} title={activeMedia.name} style={{ width: '100%', height: '100%', border: 'none' }} />}
                     </div>
                 </div>
             )}

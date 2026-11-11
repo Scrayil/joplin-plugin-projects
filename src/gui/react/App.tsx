@@ -68,6 +68,14 @@ const App: React.FC = () => {
     const [showUrgentOnly, setShowUrgentOnly] = useState(false);
     const [lastUpdated, setLastUpdated] = useState(Date.now());
     const isFetching = React.useRef(false);
+    // Sequence number of the latest fetch started, used to tell whether a fetch began
+    // after a given moment.
+    const fetchSeq = React.useRef(0);
+    // Set when a refresh is requested while a fetch is in flight: that fetch may have read
+    // the data before the change that triggered the request, so another one follows it.
+    const rerunRequested = React.useRef(false);
+    // Callers of requestFreshData, each waiting for a fetch started after its request.
+    const freshDataWaiters = React.useRef<{ afterSeq: number, resolve: () => void }[]>([]);
     const isDialogOpen = React.useRef(false);
 
     // Stale dashboard indicators
@@ -83,10 +91,21 @@ const App: React.FC = () => {
 
     /**
      * Fetches fresh dashboard data from the plugin backend.
+     *
+     * Only one fetch runs at a time. A call made while a fetch is in flight is dropped,
+     * unless rerunIfBusy is set: then a single new fetch starts as soon as the current one
+     * ends. The periodic poll never sets it, so a slow backend is not flooded with requests.
+     *
+     * @param options.rerunIfBusy Whether to fetch again after an in-flight fetch, for
+     *   callers that know the data has just changed.
      */
-    const fetchData = React.useCallback(async () => {
-        if (isFetching.current) return;
+    const fetchData = React.useCallback(async (options?: { rerunIfBusy?: boolean }) => {
+        if (isFetching.current) {
+            if (options?.rerunIfBusy) rerunRequested.current = true;
+            return;
+        }
         isFetching.current = true;
+        const seq = ++fetchSeq.current;
         try {
             const response = await window.webviewApi.postMessage({ name: 'getData' });
             // Keeps the previous data in case of errors. E.G.: undefined responses
@@ -106,6 +125,12 @@ const App: React.FC = () => {
             failures.current = 0;
             setStaleSince(null);
             setLastUpdated(Date.now());
+
+            // The data just applied was read after every request made before this fetch
+            // started, so those requests are satisfied.
+            const satisfied = freshDataWaiters.current.filter(w => w.afterSeq < seq);
+            freshDataWaiters.current = freshDataWaiters.current.filter(w => w.afterSeq >= seq);
+            satisfied.forEach(w => w.resolve());
             // Expire optimistic patches old enough for the backend to have caught up.
             setPendingPatches(prev => {
                 const ids = Object.keys(prev);
@@ -125,8 +150,26 @@ const App: React.FC = () => {
         } finally {
             setLoading(false);
             isFetching.current = false;
+            if (rerunRequested.current) {
+                rerunRequested.current = false;
+                void fetchData();
+            }
         }
     }, []);
+
+    /**
+     * Requests dashboard data read after this call, and resolves once it has been applied.
+     * A fetch already in flight does not count, since it may have read the data before the
+     * change the caller is waiting for. A failed fetch does not resolve the request: the
+     * next successful one does.
+     * @returns A promise resolved when data fetched after the call is in place.
+     */
+    const requestFreshData = React.useCallback((): Promise<void> => {
+        return new Promise<void>(resolve => {
+            freshDataWaiters.current.push({ afterSeq: fetchSeq.current, resolve });
+            void fetchData({ rerunIfBusy: true });
+        });
+    }, [fetchData]);
 
     /**
      * Detects the active Joplin theme from the editor text color and applies the
@@ -177,7 +220,7 @@ const App: React.FC = () => {
         if (window.webviewApi && window.webviewApi.onMessage) {
             window.webviewApi.onMessage((message: any) => {
                 if (message.name === 'dataChanged') {
-                    fetchData();
+                    fetchData({ rerunIfBusy: true });
                     updateTheme();
                 } else if (message.name === 'dashboardReset') {
                     setActiveTab('kanban');
@@ -558,6 +601,8 @@ const App: React.FC = () => {
                     <div style={{ height: '100%', display: activeTab === 'timeline' ? 'block' : 'none' }}>
                         <TimelineView
                             tasks={displayedTasks}
+                            allTasks={mergedTasks}
+                            requestFreshData={requestFreshData}
                             sortOption={sortOption}
                             sortApplyToken={sortApplyToken}
                             onOpenNote={handleOpenNote}

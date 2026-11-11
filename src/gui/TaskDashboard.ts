@@ -7,6 +7,13 @@ import { getAllProjects } from "../utils/projects";
 import { NoteParser } from '../services/NoteParser';
 import { TagService } from '../services/TagService';
 import { ProjectService } from '../services/ProjectService';
+import { computeTaskMove, TaskDates } from '../utils/schedule';
+
+/**
+ * The result of a Timeline date change, returned to the panel.
+ * On success, `changes` lists every task written with its new dates.
+ */
+type TaskDatesResult = { ok: true, changes: TaskDates[] } | { ok: false };
 
 /**
  * Controller class for the Task Dashboard panel.
@@ -19,6 +26,9 @@ export class TaskDashboard {
     private noteParser: NoteParser;
     private tagService: TagService;
     private projectService: ProjectService;
+    // Tail of the queue that serializes Timeline date changes, so each one computes its
+    // cascade from the dates written by the previous one.
+    private taskDatesQueue: Promise<unknown> = Promise.resolve();
 
     private constructor() {
         this.panelHandle = '';
@@ -386,38 +396,83 @@ export class TaskDashboard {
     }
 
     /**
-     * Writes the dates of a task dropped or resized on the Timeline, then shifts the tasks
-     * that depend on it by the same amount.
+     * Applies a date change made on the Timeline. Changes are queued and applied one at a
+     * time, in the order they arrive.
      *
-     * Only the dates are written: the note body, the tags and therefore the urgency are
-     * left untouched (#53). No success toast is shown. Any failure is reported with a
-     * single error toast, and the dashboard is refreshed in every case so it reflects
-     * what was actually saved. Dependents already shifted before a failure keep their
-     * new dates, since the Data API offers no transaction to roll them back.
-     *
-     * @param payload The task ID and its new start and due dates, in milliseconds since
-     *   the epoch. A start date of 0 removes the stored start date.
+     * @param payload The moved task ID and its new start and due dates, in milliseconds
+     *   since the epoch. A start date of 0 removes the stored start date.
+     * @returns The outcome, which the panel uses to confirm or revert its optimistic state.
      */
-    private async updateTaskDates(payload: { taskId: string, startDate: number, dueDate: number }) {
+    private updateTaskDates(payload: { taskId: string, startDate: number, dueDate: number }): Promise<TaskDatesResult> {
+        const run = this.taskDatesQueue.then(() => this.applyTaskDates(payload));
+        // A failed change must not block the ones queued after it.
+        this.taskDatesQueue = run.catch(() => undefined);
+        return run;
+    }
+
+    /**
+     * Writes the dates of a task dropped or resized on the Timeline, and shifts the tasks
+     * that depend on it, as computed by computeTaskMove, the same function the panel uses
+     * to show the result before it is saved.
+     *
+     * Only the dates are written (#53). No success toast is shown. When a write fails, the
+     * tasks already written are restored to their previous dates and a single error toast
+     * is shown. The dashboard is refreshed in every case.
+     *
+     * @param payload The moved task ID and its new start and due dates.
+     * @returns The written changes on success, otherwise a failure result. Never throws.
+     */
+    private async applyTaskDates(payload: { taskId: string, startDate: number, dueDate: number }): Promise<TaskDatesResult> {
+        const previousDates: TaskDates[] = [];
         try {
-            const originalNote = await getNote(payload.taskId, ['todo_due']);
-            // The due date is the reference point for the shift applied to dependents.
-            const deltaMs = payload.dueDate - (originalNote.todo_due || 0);
-
-            await this.writeTaskDates(payload.taskId, payload.startDate, payload.dueDate);
-
-            if (deltaMs !== 0) {
-                const allTasks = (await this.projectService.getDashboardData()).tasks;
-                // The visited set guards against circular dependencies.
-                const visited = new Set<string>([payload.taskId]);
-                await this.cascadeTaskUpdate(payload.taskId, deltaMs, allTasks, visited);
+            const tasks = (await this.projectService.getDashboardData()).tasks;
+            const changes = computeTaskMove(tasks, payload.taskId, payload.startDate, payload.dueDate);
+            if (changes.length === 0) {
+                throw new Error(`Task ${payload.taskId} is not part of any project`);
             }
+
+            const tasksById = new Map<string, any>(tasks.map((t: any) => [t.id, t]));
+            for (const change of changes) {
+                const previous = tasksById.get(change.id);
+                await this.writeTaskDates(change.id, change.startDate, change.dueDate);
+                previousDates.push({ id: change.id, startDate: previous.startDate || 0, dueDate: previous.dueDate || 0 });
+            }
+
+            return { ok: true, changes };
         } catch (error) {
             console.error('TaskDashboard: Error updating task dates:', error);
-            await joplin.views.dialogs.showToast({ message: "Error updating task dates", duration: 3000, type: ToastType.Error });
+            const restored = await this.restoreTaskDates(previousDates);
+            await joplin.views.dialogs.showToast({
+                message: restored
+                    ? "Error updating task dates"
+                    : "Error updating task dates. Some tasks could not be restored, check their dates",
+                duration: 4000,
+                type: ToastType.Error
+            });
+            return { ok: false };
         } finally {
             await joplin.views.panels.postMessage(this.panelHandle, { name: 'dataChanged' });
         }
+    }
+
+    /**
+     * Restores the dates of tasks written by a failed Timeline change, in reverse order.
+     * Every task is attempted even when an earlier one fails.
+     *
+     * @param previousDates The dates each written task had before the change.
+     * @returns True when every task was restored.
+     */
+    private async restoreTaskDates(previousDates: TaskDates[]): Promise<boolean> {
+        let allRestored = true;
+        for (const previous of [...previousDates].reverse()) {
+            try {
+                await this.writeTaskDates(previous.id, previous.startDate, previous.dueDate);
+            } catch (error) {
+                console.error(`TaskDashboard: Could not restore the dates of task ${previous.id}:`, error);
+                allRestored = false;
+            }
+        }
+        return allRestored;
     }
 
     /**
@@ -449,43 +504,6 @@ export class TaskDashboard {
             todo_due: dueDate,
             application_data: JSON.stringify(appData)
         });
-    }
-
-    /**
-     * Recursively shifts the dates of the tasks that depend on the given task. Only the
-     * dates are written, through writeTaskDates.
-     *
-     * Every dependent is shifted by the same delta, whatever its dependency type, so the
-     * relative schedule is preserved. The dates are resolved as the Timeline draws them:
-     * a missing start date falls back to the creation time, a missing due date to the
-     * start date.
-     *
-     * @param sourceTaskId The ID of the task that was moved.
-     * @param deltaMs The amount of time, in milliseconds, to shift dependent tasks by.
-     * @param allTasks The complete list of dashboard tasks, read before the shift.
-     * @param visited The IDs already shifted in this chain, which prevents circular loops.
-     * @throws When a dependent task cannot be written; the remaining ones are not shifted.
-     */
-    private async cascadeTaskUpdate(sourceTaskId: string, deltaMs: number, allTasks: any[], visited: Set<string>) {
-        const dependentTasks = allTasks.filter(t =>
-            t.dependsOn && Array.isArray(t.dependsOn) && t.dependsOn.some((d: any) => d.id === sourceTaskId)
-        );
-
-        for (const targetTask of dependentTasks) {
-            if (visited.has(targetTask.id)) continue;
-            visited.add(targetTask.id);
-
-            const targetStart = targetTask.startDate || targetTask.createdTime;
-            const targetDue = targetTask.dueDate || targetStart;
-
-            await this.writeTaskDates(
-                targetTask.id,
-                targetStart > 0 ? targetStart + deltaMs : targetStart,
-                targetDue > 0 ? targetDue + deltaMs : targetDue
-            );
-
-            await this.cascadeTaskUpdate(targetTask.id, deltaMs, allTasks, visited);
-        }
     }
 
     /**

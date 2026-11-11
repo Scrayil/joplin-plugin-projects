@@ -2,9 +2,14 @@ import * as React from 'react';
 import { Task } from '../types';
 import {formatDate} from "../utils";
 import TaskContextMenu from './TaskContextMenu';
+import { computeTaskMove } from '../../../utils/schedule';
 
 interface TimelineViewProps {
     tasks: Task[];
+    // Every task, unfiltered: a move can shift dependents hidden by the current filters.
+    allTasks: Task[];
+    // Resolves once dashboard data read after the call is in place.
+    requestFreshData: () => Promise<void>;
     sortOption: string;
     sortApplyToken: number;
     onOpenNote: (taskId: string) => void;
@@ -15,7 +20,7 @@ interface TimelineViewProps {
 /**
  * Renders a Gantt-like timeline view of tasks based on their creation and due dates.
  */
-const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortApplyToken, onOpenNote, onEditTask, onUpdateDependencies }) => {
+const TimelineView: React.FC<TimelineViewProps> = ({ tasks, allTasks, requestFreshData, sortOption, sortApplyToken, onOpenNote, onEditTask, onUpdateDependencies }) => {
     const [contextMenu, setContextMenu] = React.useState<{x: number, y: number, task: Task} | null>(null);
     const [zoomLevel, setZoomLevel] = React.useState<number>(1); // 1 = Month, 2 = Week, 3 = Day
     const [visibleRange, setVisibleRange] = React.useState<{start: number, end: number}>({start: 0, end: 0});
@@ -35,7 +40,11 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
 
     // States for Task Bar Drag & Drop (Scheduling)
     const [draggingTask, setDraggingTask] = React.useState<{ id: string, initialX: number, initialStart: number, initialDue: number, type: 'move' | 'resizeStart' | 'resizeEnd' } | null>(null);
-    const [tempTaskDates, setTempTaskDates] = React.useState<Record<string, { start: number, end: number }>>({});
+    // Dates drawn in place of the fetched ones. An entry without opId follows the bar being
+    // dragged; an entry with opId belongs to a dropped move still being saved, and is
+    // dropped only by that move, once fresh data is in place or the save has failed (#52).
+    const [tempTaskDates, setTempTaskDates] = React.useState<Record<string, { start: number, end: number, opId?: number }>>({});
+    const lastMoveOpId = React.useRef(0);
 
     // When the user manually edits dates, the row order is frozen to the snapshot below so
     // the timeline does not reshuffle mid-editing. It resumes following the global sort when
@@ -188,34 +197,17 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
         const onUp = () => {
             if (draggingTask) {
                 suppressRowClickRef.current = true;
-                const draggedId = draggingTask.id;
-                const tempDates = tempTaskDates[draggedId];
-                if (tempDates) {
-                    // Only the dates are sent: the backend writes nothing else (#53).
-                    window.webviewApi.postMessage({
-                        name: 'updateTaskDates',
-                        payload: {
-                            taskId: draggedId,
-                            startDate: tempDates.start,
-                            dueDate: tempDates.end
-                        }
-                    });
+                const tempDates = tempTaskDates[draggingTask.id];
+                // Only an entry without opId comes from this drag; a click without movement
+                // leaves in place the entry of a move still being saved, and saves nothing.
+                // A drag released where it started is saved like any other, so it is ordered
+                // after the moves still being saved.
+                if (tempDates && tempDates.opId === undefined) {
+                    commitMove(draggingTask, tempDates.start, tempDates.end);
                     // Freeze the current row order so the date change does not reshuffle rows.
                     setFrozenOrder(rowOrderRef.current.slice());
                 }
-                // The optimistic dates are kept until the refreshed data catches up
-                // (cleared by the reconciliation effect below), preventing the bar from
-                // snapping back to its old position during the backend round-trip. The
-                // timeout is only a safety net should the update never round-trip.
                 setDraggingTask(null);
-                setTimeout(() => {
-                    setTempTaskDates(prev => {
-                        if (!(draggedId in prev)) return prev;
-                        const next = { ...prev };
-                        delete next[draggedId];
-                        return next;
-                    });
-                }, 8000);
             }
             setMousePos(null);
         };
@@ -226,32 +218,104 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
         };
-    }, [draggingTask, containerWidth, viewDuration, tempTaskDates, tasks]);
+    }, [draggingTask, containerWidth, viewDuration, tempTaskDates, allTasks, requestFreshData]);
 
-    React.useEffect(() => {
-        if (draggingTask) return;
-        setTempTaskDates(prev => {
-            const ids = Object.keys(prev);
-            if (ids.length === 0) return prev;
-            let changed = false;
-            const next = { ...prev };
-            for (const id of ids) {
-                const task = tasks.find(t => t.id === id);
-                if (!task) {
-                    delete next[id];
-                    changed = true;
-                    continue;
-                }
-                const realStart = task.startDate || task.createdTime;
-                const realDue = task.dueDate || realStart;
-                if (Math.abs(realStart - next[id].start) <= 1000 && Math.abs(realDue - next[id].end) <= 1000) {
-                    delete next[id];
-                    changed = true;
-                }
-            }
-            return changed ? next : prev;
+    /**
+     * Returns the task with the dates currently drawn for it: the dates of a drag in
+     * progress or of a move still being saved, otherwise the fetched ones. Everything
+     * drawn from a task's dates (bars, dependency arrows, conflict highlighting) reads
+     * them through here, so it all moves together.
+     * @param task The task as fetched.
+     * @returns The same task when nothing is pending for it, otherwise a copy with the
+     *   drawn start and due dates.
+     */
+    const withDrawnDates = (task: Task): Task => {
+        const pending = tempTaskDates[task.id];
+        return pending ? { ...task, startDate: pending.start, dueDate: pending.end } : task;
+    };
+
+    /**
+     * Saves a dropped move optimistically (#52). The final dates of the moved task and of
+     * every dependent it shifts are drawn at once, computed by computeTaskMove exactly as
+     * the backend will compute them, and kept until fresh data has been fetched after the
+     * save, so a refresh read before the save cannot move any bar. If the save fails, the
+     * bars return to the fetched dates; the backend restores what it wrote and shows the
+     * error toast.
+     *
+     * @param drag The drag that ended, carrying the dates the moved task had before it.
+     * @param startDate The new start date of the moved task.
+     * @param dueDate The new due date of the moved task.
+     */
+    const commitMove = (drag: { id: string, initialStart: number, initialDue: number }, startDate: number, dueDate: number) => {
+        const opId = ++lastMoveOpId.current;
+
+        // The cascade is computed on the dates currently drawn, including moves still being
+        // saved; the backend saves moves in order, so it starts from the same dates.
+        const drawnTasks = allTasks.map(t => {
+            if (t.id === drag.id) return { ...t, startDate: drag.initialStart, dueDate: drag.initialDue };
+            const pending = tempTaskDates[t.id];
+            return pending ? { ...t, startDate: pending.start, dueDate: pending.end } : t;
         });
-    }, [tasks, draggingTask]);
+        const predicted = computeTaskMove(drawnTasks, drag.id, startDate, dueDate);
+
+        /**
+         * Draws the given dates for this move.
+         * @param changes The dates to draw.
+         * @param ownedOnly When false, older entries of the same tasks are replaced. When true,
+         *   only entries this move still owns are updated, so a later move or a drag in
+         *   progress on one of the tasks keeps its own dates.
+         */
+        const drawChanges = (changes: { id: string, startDate: number, dueDate: number }[], ownedOnly: boolean) => {
+            setTempTaskDates(prev => {
+                const next = { ...prev };
+                for (const c of changes) {
+                    if (ownedOnly && next[c.id]?.opId !== opId) continue;
+                    next[c.id] = { start: c.startDate, end: c.dueDate, opId };
+                }
+                return next;
+            });
+        };
+
+        /**
+         * Removes the entries still owned by this move; entries replaced by a later move
+         * are left to that move.
+         */
+        const releaseEntries = () => {
+            setTempTaskDates(prev => {
+                let changed = false;
+                const next = { ...prev };
+                for (const id of Object.keys(next)) {
+                    if (next[id].opId === opId) {
+                        delete next[id];
+                        changed = true;
+                    }
+                }
+                return changed ? next : prev;
+            });
+        };
+
+        drawChanges(predicted, false);
+
+        void (async () => {
+            let result: any = null;
+            try {
+                result = await window.webviewApi.postMessage({
+                    name: 'updateTaskDates',
+                    // Only the dates are sent: the backend writes nothing else (#53).
+                    payload: { taskId: drag.id, startDate, dueDate }
+                });
+            } catch (error) {
+                console.error('TimelineView: Error saving task dates:', error);
+            }
+
+            if (result && result.ok) {
+                // The backend result is authoritative should it differ from the prediction.
+                if (Array.isArray(result.changes)) drawChanges(result.changes, true);
+                await requestFreshData();
+            }
+            releaseEntries();
+        })();
+    };
 
     /**
      * Begins a dependency drag from a task handle. Window listeners are attached
@@ -794,14 +858,16 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
                                 const sourceIndex = timelineTasks.findIndex(t => t.id === dep.id);
                                 if (sourceIndex === -1) return null;
                                 
-                                const sourceTask = timelineTasks[sourceIndex];
+                                // Both ends follow the drawn dates, so an arrow moves with its bars.
+                                const sourceTask = withDrawnDates(timelineTasks[sourceIndex]);
+                                const targetTask = withDrawnDates(task);
                                 
                                 // Determine line connection points based on dependency type
                                 const isSourceEnd = dep.type === 'FS' || dep.type === 'FF';
                                 const isTargetEnd = dep.type === 'SF' || dep.type === 'FF';
 
                                 const sourceTime = isSourceEnd ? (sourceTask.dueDate || sourceTask.startDate || sourceTask.createdTime) : (sourceTask.startDate || sourceTask.createdTime);
-                                const targetTime = isTargetEnd ? (task.dueDate || task.startDate || task.createdTime) : (task.startDate || task.createdTime);
+                                const targetTime = isTargetEnd ? (targetTask.dueDate || targetTask.startDate || targetTask.createdTime) : (targetTask.startDate || targetTask.createdTime);
 
                                 const sourceX = (getPosition(sourceTime) / 100) * containerWidth;
                                 const targetX = (getPosition(targetTime) / 100) * containerWidth;
@@ -838,7 +904,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
                                 }
 
                                 const isCriticalLink = showCriticalPath && criticalIds.has(task.id) && criticalIds.has(dep.id);
-                                const violated = isDependencyViolated(task, sourceTask, dep.type);
+                                const violated = isDependencyViolated(targetTask, sourceTask, dep.type);
 
                                 // A scheduling conflict (red) takes visual priority over the critical
                                 // path (violet); otherwise the dependency uses the subtle default style.
@@ -952,7 +1018,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
                                             if (bodyRef.current) {
                                                 const rect = bodyRef.current.getBoundingClientRect();
                                                 const currentX = e.clientX - rect.left + bodyRef.current.scrollLeft;
-                                                setDraggingTask({ id: task.id, initialX: currentX, initialStart: task.startDate || task.createdTime, initialDue: task.dueDate || task.startDate || task.createdTime, type: 'move' });
+                                                setDraggingTask({ id: task.id, initialX: currentX, initialStart: effectiveStart, initialDue: effectiveDue, type: 'move' });
                                             }
                                         }}
                                         title={`${task.projectName}\n${task.title} (Milestone)`}
@@ -975,8 +1041,8 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
                                             setDraggingTask({ 
                                                 id: task.id, 
                                                 initialX: currentX, 
-                                                initialStart: task.startDate || task.createdTime, 
-                                                initialDue: task.dueDate || task.startDate || task.createdTime,
+                                                initialStart: effectiveStart, 
+                                                initialDue: effectiveDue,
                                                 type: 'move'
                                             });
                                         }
@@ -1014,8 +1080,8 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
                                                 setDraggingTask({ 
                                                     id: task.id, 
                                                     initialX: currentX, 
-                                                    initialStart: task.startDate || task.createdTime, 
-                                                    initialDue: task.dueDate || task.startDate || task.createdTime,
+                                                    initialStart: effectiveStart, 
+                                                    initialDue: effectiveDue,
                                                     type: 'resizeStart'
                                                 });
                                             }
@@ -1034,8 +1100,8 @@ const TimelineView: React.FC<TimelineViewProps> = ({ tasks, sortOption, sortAppl
                                                 setDraggingTask({ 
                                                     id: task.id, 
                                                     initialX: currentX, 
-                                                    initialStart: task.startDate || task.createdTime, 
-                                                    initialDue: task.dueDate || task.startDate || task.createdTime,
+                                                    initialStart: effectiveStart, 
+                                                    initialDue: effectiveDue,
                                                     type: 'resizeEnd'
                                                 });
                                             }

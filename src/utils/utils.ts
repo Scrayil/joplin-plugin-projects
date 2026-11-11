@@ -1,5 +1,5 @@
 import Logger from "@joplin/utils/Logger";
-import * as fs from "node:fs";
+import * as fs from "fs";
 import joplin from "../../api";
 import {Config} from "./constants";
 import {WikiNode} from "./types";

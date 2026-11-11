@@ -4,7 +4,7 @@ import {ToastType} from "../../api/types";
 import {Config} from "../utils/constants";
 import Logger from "@joplin/utils/Logger";
 import {readFileContent, getPluginFolder} from "../utils/utils";
-import * as path from "node:path";
+import * as path from "path";
 
 const logger = Logger.create('Projects: Index');
 

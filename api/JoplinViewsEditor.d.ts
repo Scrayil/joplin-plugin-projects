@@ -1,4 +1,5 @@
-import Plugin from '../Plugin';
+import Plugin, { MessageListenerCallback } from '../Plugin';
+import { PluginStore } from '../ViewController';
 import { ActivationCheckCallback, ViewHandle, UpdateCallback, EditorPluginCallbacks } from './types';
 interface SaveNoteOptions {
     /**
@@ -35,8 +36,8 @@ interface SaveNoteOptions {
  * - `onUpdate`: When this is called you should update your editor based on the current note
  *   content. Call `joplin.workspace.selectedNote()` to get the current note.
  *
- * - `showEditorPlugin` and `toggleEditorPlugin` commands.ts. Additionally you can use these commands.ts
- *   to display your editor via `joplin.commands.ts.execute('showEditorPlugin')`. This is not always
+ * - `showEditorPlugin` and `toggleEditorPlugin` commands. Additionally you can use these commands
+ *   to display your editor via `joplin.commands.execute('showEditorPlugin')`. This is not always
  *   necessary since the user can switch to your editor using the "toggle editor" button, however
  *   you may want to programmatically display the editor in some cases - for example when creating a
  *   new note specific to your editor.
@@ -55,7 +56,7 @@ export default class JoplinViewsEditors {
     private plugin;
     private activationCheckHandlers_;
     private unhandledActivationCheck_;
-    constructor(plugin: Plugin, store: any);
+    constructor(plugin: Plugin, store: PluginStore);
     private controller;
     /**
      * Registers a new editor plugin. Joplin will call the provided callback to create new editor views
@@ -79,7 +80,7 @@ export default class JoplinViewsEditors {
     /**
      * See [[JoplinViewPanels]]
      */
-    onMessage(handle: ViewHandle, callback: Function): Promise<void>;
+    onMessage(handle: ViewHandle, callback: MessageListenerCallback): Promise<void>;
     /**
      * Saves the content of the editor, without calling `onUpdate` for editors in the same window.
      */

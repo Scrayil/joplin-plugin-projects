@@ -1,5 +1,13 @@
 {
 	"extraScripts": [
 		"gui/react/index.tsx"
-	]
+	],
+	"webpackOverrides": {
+		"optimization": {
+			"minimizeOptions": {
+				"css": false,
+				"html": false
+			}
+		}
+	}
 }

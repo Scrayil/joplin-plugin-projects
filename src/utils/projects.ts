@@ -9,7 +9,7 @@ import {
     isValidWikiStructure,
     sanitizeTitle
 } from "./utils";
-import * as path from "node:path";
+import * as path from "path";
 import { 
     createNote, 
     createNotebook, 

@@ -6,6 +6,11 @@ An advanced project management plugin for Joplin that turns your notes into a vi
 
 ![Plugin Screenshot](https://github.com/Scrayil/joplin-plugin-projects/blob/main/assets/promo.png)
 
+## Development status
+
+This plugin is maintained in bursts rather than continuously, alongside other projects. Issues and pull requests are read and answered, but response times can vary, sometimes by weeks.  
+Development is now AI-assisted. Every change is reviewed, verified and committed by the maintainer, who remains responsible for the code and for every decision made on this project.
+
 ## ✨ Features
 
 - **Project-Based Organization**: Group your notes and tasks into distinct projects, each with its own folder structure.
